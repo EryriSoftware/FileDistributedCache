@@ -53,4 +53,14 @@ public record FileCacheOptions
             field = value;
         }
     }
+
+    /// <summary>
+    /// Gets or sets the default sliding expiration for items without one.
+    /// </summary>
+    public TimeSpan? DefaultSlidingExpiration = null;
+
+    /// <summary>
+    /// Gets or sets the default Time To Live for items an absolute expiry set. Calculated from the time the item is added to the cache.
+    /// </summary>
+    public TimeSpan? DefaultAbsoluteExpirationRelativeToNow = null;
 }

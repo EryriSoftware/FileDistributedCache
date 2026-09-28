@@ -18,7 +18,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         ILogger<FileDistributedCache>? logger = null)
     {
         this.timeProvider = timeProvider;
-        this.options = optionsAccessor.Value;
+        settings = optionsAccessor.Value;
         this.logger = logger;
         cleanupTimer = timeProvider.CreateTimer(_ => RemoveExpired(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         metadata = new FileCacheMetadata(optionsAccessor.Value.EvictionPolicy);
@@ -26,7 +26,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     private bool isDisposed = false;
     private readonly ILogger? logger;
-    private readonly FileCacheOptions options;
+    private readonly FileCacheOptions settings;
     private readonly TimeProvider timeProvider;
     private readonly DirectoryInfo cacheDirectory = Directory.CreateTempSubdirectory();
     private readonly FileCacheMetadata metadata;
@@ -220,8 +220,12 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         {
             AbsoluteExpiration = options.AbsoluteExpirationRelativeToNow.HasValue
                 ? now.Add(options.AbsoluteExpirationRelativeToNow.Value)
-                : options.AbsoluteExpiration,
-            SlidingExpiration = options.SlidingExpiration
+                : options.AbsoluteExpiration.HasValue
+                ? options.AbsoluteExpiration
+                : settings.DefaultSlidingExpiration.HasValue
+                ? now.Add(settings.DefaultSlidingExpiration.Value)
+                : null,
+            SlidingExpiration = options.SlidingExpiration ?? settings.DefaultSlidingExpiration
         };
     }
 
@@ -269,7 +273,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         {
             var now = timeProvider.GetUtcNow();
             nextCleanup = dueTime.Value;
-            var seconds = Math.Max(options.ExpirationScanFrequency.TotalSeconds, (dueTime.Value - now).TotalSeconds);
+            var seconds = Math.Max(settings.ExpirationScanFrequency.TotalSeconds, (dueTime.Value - now).TotalSeconds);
             cleanupTimer.Change(TimeSpan.FromSeconds(seconds), Timeout.InfiniteTimeSpan);
         }
     }
@@ -309,9 +313,9 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     private void EnsureCapacityFor(long requiredFreeSpace)
     {
-        if (options.SizeLimitBytes > 0 && requiredFreeSpace < options.SizeLimitBytes)
+        if (settings.SizeLimitBytes > 0 && requiredFreeSpace < settings.SizeLimitBytes)
         {
-            while (requiredFreeSpace + metadata.Size > options.SizeLimitBytes
+            while (requiredFreeSpace + metadata.Size > settings.SizeLimitBytes
                 && metadata.TryDequeueEvictionPolicy(out var item))
             {
                 Remove(item);
