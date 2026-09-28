@@ -3,15 +3,14 @@ using System.Security.Cryptography;
 using FluentAssertions;
 using Microsoft.Extensions.Caching.Distributed;
 
-namespace Eryri.Extensions.Caching.FileSystem.Tests;
+namespace Eryri.Extensions.Caching.FileSystem.Tests.Performance;
 
 [TestFixture, Parallelizable(ParallelScope.All)]
-public class ConcurrencyTests()
+public class FullCacheChurnTests : PerformanceTestsBase
 {
-    private const int EntriesCount = 1_000;
-    private const int PayloadSize = 1;
-    private const int CacheSizeLimit = PayloadSize * 10;
-    private readonly byte[] Payload = RandomNumberGenerator.GetBytes(PayloadSize);
+    protected const int PayloadSize = 1;
+    protected const int CacheSizeLimit = PayloadSize * 10;
+    protected readonly byte[] Payload = RandomNumberGenerator.GetBytes(PayloadSize);
 
     [Test]
     public void Set_Has_No_Conficts([Values] EvictionPolicy evictionPolicy)
@@ -32,7 +31,7 @@ public class ConcurrencyTests()
         ctx.Cache.Size.Should().Be(CacheSizeLimit);
 
         // Act
-        Parallel.For(0, ticks.Length, i =>
+        for (int i = 0; i < ticks.Length; i++)
         {
             var key = Guid.NewGuid().ToString("N");
             long start = Stopwatch.GetTimestamp();
@@ -40,18 +39,10 @@ public class ConcurrencyTests()
             ctx.Cache.Set(key, Payload, options);
 
             ticks[i] = Stopwatch.GetTimestamp() - start;
-        });
+        }
 
         // Assert
-        Array.Sort(ticks);
-
-        Console.WriteLine($"P01: {MsAt(0.01):F3} ms");
-        Console.WriteLine($"P10: {MsAt(0.10):F3} ms");
-        Console.WriteLine($"P50: {MsAt(0.50):F3} ms");
-        Console.WriteLine($"P95: {MsAt(0.95):F3} ms");
-        Console.WriteLine($"P99: {MsAt(0.99):F3} ms");
-
-        double MsAt(double percentile) => ticks[(int)Math.Ceiling(percentile * ticks.Length) - 1] * 1000.0 / Stopwatch.Frequency;
+        PrintLatency(ticks);
     }
 
     [Test]
@@ -73,25 +64,17 @@ public class ConcurrencyTests()
         ctx.Cache.Size.Should().Be(CacheSizeLimit);
 
         // Act
-        await Parallel.ForAsync(0, ticks.Length, TestContext.CurrentContext.CancellationToken, async (i, ct) =>
+        for (int i = 0; i < ticks.Length; i++)
         {
             var key = Guid.NewGuid().ToString("N");
             long start = Stopwatch.GetTimestamp();
 
-            await ctx.Cache.SetAsync(key, Payload, options, ct);
+            await ctx.Cache.SetAsync(key, Payload, options, TestContext.CurrentContext.CancellationToken);
 
             ticks[i] = Stopwatch.GetTimestamp() - start;
-        });
+        }
 
         // Assert
-        Array.Sort(ticks);
-
-        Console.WriteLine($"P01: {MsAt(0.01):F3} ms");
-        Console.WriteLine($"P10: {MsAt(0.10):F3} ms");
-        Console.WriteLine($"P50: {MsAt(0.50):F3} ms");
-        Console.WriteLine($"P95: {MsAt(0.95):F3} ms");
-        Console.WriteLine($"P99: {MsAt(0.99):F3} ms");
-
-        double MsAt(double percentile) => ticks[(int)Math.Ceiling(percentile * ticks.Length) - 1] * 1000.0 / Stopwatch.Frequency;
+        PrintLatency(ticks);
     }
 }
