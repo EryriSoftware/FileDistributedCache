@@ -1,5 +1,6 @@
 ﻿using System.Security.Cryptography;
 using AutoFixture;
+using Eryri.Extensions.Caching.FileSystem.Tests.Contexts;
 using FluentAssertions;
 using Microsoft.Extensions.Caching.Distributed;
 

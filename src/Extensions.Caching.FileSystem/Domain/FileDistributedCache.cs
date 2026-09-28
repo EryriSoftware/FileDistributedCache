@@ -291,6 +291,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     private long RemoveExpired()
     {
+        nextCleanup = DateTimeOffset.MaxValue;
         long removedBytes = 0;
         var now = timeProvider.GetUtcNow();
         while (metadata.TryDequeueTTL(out var item))

@@ -1,38 +1,42 @@
-# Eryri.FileDistributedCache
-##### `using Eryri.Extensions.Caching.FileSystem;`
+# [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
 
+**Keep more reusable data without giving more RAM to your cache—or running another cache service.** Eryri.FileDistributedCache stores disposable cache values on the local filesystem behind .NET's `IDistributedCache` and `IBufferDistributedCache` APIs. Give it a byte limit and it evicts entries to make room *before* admitting a new write; expired entries are cleaned up automatically.
 
-A filesystem-backed cache for .NET applications, exposed through `IDistributedCache` and `IBufferedDistributedCache`.
-
-Built for low-latency, high-throughput access within a single process, with thread-safe operations and Native AOT compatibility. It supports configurable eviction, entry expiration, and a cache size limit.
+It is built for a **single process**, with concurrent access, configurable eviction, synchronous and asynchronous operations, and Native AOT compatibility. Use it directly when local disk is the right cache, or register it as the secondary provider for `HybridCache` when you want a memory-first cache with a larger local-disk tier.
 
 > [!IMPORTANT]
-> **Process-local, not distributed.** Implementing `IDistributedCache` does not make this a shared cache. Each application process has its own cache; do not use it when multiple instances must see the same entries.
-
-<!-- IMAGE PLACEHOLDER: Add a small, measured benchmark chart or architecture image after verifying the behavior. -->
+> **Local, ephemeral, not shared.** `IDistributedCache` is the interface this package implements, not a promise of distributed storage. Each process has its own cache; entries are disposable and must be recoverable from your source of truth. Do not use this provider when replicas must share entries or cache contents must survive restarts.
 
 ## Why use it?
 
-- **Familiar integration:** Use the standard `IDistributedCache` API in an application that needs a local cache.
-- **Filesystem-backed payloads:** Cache data is stored as files in a temporary directory rather than presented as a shared cache service.
-- **Control over capacity:** Set a size limit and choose which entries are evicted when space is needed.
-- **Expiration built in:** Configure absolute or sliding expiration per entry; expired entries are removed automatically.
-- **Deployment flexibility:** Synchronous and asynchronous operations, thread safety, `IBufferedDistributedCache`, and Native AOT compatibility.
+- **Keep RAM for your application.** Store reusable payloads in files rather than retaining the whole disk-backed cache in memory. A local filesystem is useful when your reusable working set is larger than the memory budget you want to assign to caching.
+- **Keep writes moving near capacity.** Set a byte limit and the cache evicts entries when needed to make room *before* adding a new one. Choose LRU, LFU, FIFO or TTL to decide what goes first.
+- **Let expired data clean itself up.** Absolute and sliding expiration are supported. A background cleanup timer is rescheduled for the next expiry, using a priority queue rather than relying solely on fixed-interval sweeps.
+- **Fit familiar .NET APIs.** Use `IDistributedCache` or `IBufferDistributedCache`; the implementation is thread-safe and Native AOT-compatible.
+- **Avoid a new service for a local need.** There is no cache server to deploy just to give one process more disposable cache capacity. The trade-off is that entries are not shared across processes.
 
-A good fit is a single-process service or worker whose cached values are disposable and can be regenerated. If you need a shared cache across replicas or persistence across restarts, choose a backend designed for that requirement.
+**Good fit:** a single-process service or worker with reproducible cache values and useful local disk space. **Not a fit:** cross-replica consistency, persistence, or a filesystem you cannot afford to fill with disposable data. The cache's configured byte limit controls its own entries; it does not reserve free space for other applications.
 
-## Install
+## Scope at a glance
 
+| Requirement | This package |
+| --- | --- |
+| Familiar .NET caching interface | `IDistributedCache` and `IBufferDistributedCache` |
+| Local disk for disposable cache values | Yes |
+| Expiry eviction | Yes; automatic; rescheduled for the next expiry, using a priority queue rather than relying solely on fixed-interval sweeps |
+| Capacity-based eviction | Yes; set a byte limit for automatic capacity eviction |
+| Shared entries across application processes | No |
+| Cache persistence across restarts | No |
+| Automatic RAM-pressure-triggered spill | No; use as a disk-backed tier, not as an automatic memory overflow mechanism |
+
+## Install and get started
+
+The NuGet package ID is `Eryri.FileDistributedCache`.
 ```bash
 dotnet add package Eryri.FileDistributedCache
 ```
 
-> [!NOTE]
-> The NuGet package ID is `Eryri.FileDistributedCache`; the namespace is `Eryri.Extensions.Caching.FileSystem`.
-
-## Quick start
-
-Register the cache and use it through `IDistributedCache`:
+The namespace is `Eryri.Extensions.Caching.FileSystem`.
 
 ```csharp
 using Eryri.Extensions.Caching.FileSystem;
@@ -57,13 +61,11 @@ var value = await cache.GetStringAsync("product:42");
 Console.WriteLine(value ?? "Cache miss");
 ```
 
-In a real application, fetch or compute the value on a miss and write it back to the cache. Always treat a cache miss as normal, including after expiration or restart.
+Treat a miss as normal: an entry may have expired, been evicted, or disappeared when the process restarted. Retrieve or recompute the value from its source of truth and write it back.
 
-<!-- EXAMPLE PLACEHOLDER: Link to a complete ASP.NET Core or worker-service example in this repository. -->
+### Use with [HybridCache](https://learn.microsoft.com/en-us/aspnet/core/performance/caching/hybrid)
 
-### Use with HybridCache
-
-Register this package as the secondary cache provider, then register `HybridCache`:
+`HybridCache` can use an `IDistributedCache` provider as its secondary tier. Register this provider alongside `HybridCache` to put a local filesystem behind the usual in-memory tier. This is **not** a guarantee that values spill to disk only after RAM fills: `HybridCache` manages its tiers according to its own behavior and configuration.
 
 ```csharp
 using Eryri.Extensions.Caching.FileSystem;
@@ -79,7 +81,7 @@ var cache = services.GetRequiredService<HybridCache>();
 var options = new HybridCacheEntryOptions
 {
     Expiration = TimeSpan.FromMinutes(10),
-    LocalCacheExpiration = TimeSpan.FromSeconds(5),
+    LocalCacheExpiration = TimeSpan.FromSeconds(5), // Keep in-memory items for only a short period
     Flags = HybridCacheEntryFlags.DisableLocalCache // Disables the 'IMemoryCache' for the purpose of thie example
 };
 
@@ -93,116 +95,79 @@ var value = await cache.GetOrCreateAsync(
 Console.WriteLine(value);
 ```
 
-`DisableLocalCache` makes the `HybridCache` use the secondary `IDistributedCache` cache rather than a `IMemoryCache` local hit. Remove that flag when you want the normal `HybridCache` local in-memory tier. The filesystem cache remains process-local in either case.
+Both tiers remain local to this process. For a shared secondary cache across replicas, use a backend designed for sharing.
 
-<!-- DIAGRAM PLACEHOLDER: Once verified, show Application -> HybridCache local tier -> filesystem-backed secondary provider; label both tiers process-local. -->
+## Expiration and capacity
 
-## Expiration and eviction
+Set a byte-based size limit if you want the cache to control its footprint. When a new entry would exceed that limit, the cache evicts existing entries as needed *before* adding it. The configured eviction policy determines which eligible entries are selected. Expired entries are also removed automatically by a background timer scheduled for the next expiry.
 
-Choose an eviction policy to determine which entries are removed when an incoming write would exceed the configured cache size limit:
+| Policy | Entry selected for capacity eviction | Useful when |
+| --- | --- | --- |
+| LRU | Least recently used | Recently accessed data is most likely to be needed again. |
+| LFU | Least frequently used | Frequently requested data should survive short bursts of one-off reads. |
+| FIFO | First added | Simple insertion order is preferable when older data becomes less useful over time. |
+| TTL | Soonest to expire | Entries closest to expiry have the least remaining useful life. |
 
-| Policy | Selection principle |
-| --- | --- |
-| LRU | Least recently used. |
-| LFU | Least frequently used. |
-| TTL | Soonest to expire. |
-| FIFO | First added. |
+The package supports `DistributedCacheEntryOptions`: `AbsoluteExpiration`, `AbsoluteExpirationRelativeToNow`, and `SlidingExpiration`. Expiration controls whether an entry is valid; a capacity policy chooses which entries to remove to admit new data. The two are different mechanisms.
 
-Entries can use `DistributedCacheEntryOptions.AbsoluteExpiration`, `AbsoluteExpirationRelativeToNow`, and `SlidingExpiration`. A background timer removes expired entries; it is scheduled for the next entry due to expire.
-If a newly added entry would exceed the configured size limit, expired entries are removed according to the selected eviction policy.
+For manual capacity reduction, `IFileDistributedCache.Compact(decimal percentage)` selects entries according to the configured eviction policy. For example, `Compact(0.10)` requests removal of at least 10% of existing entries. This is useful even when no size limit is configured.
 
-When no size limit is configured, `IFileDistributedCache.Compact(double percentage)` can manually remove at least the specified fraction of entries according to the eviction policy. For example, `0.10` requests removal of at least 10%.
-
-<!-- DIAGRAM PLACEHOLDER: Illustrate expiration, size-limit check, and policy-based eviction; verify the exact write path before publishing. -->
-
-## Configuration
+### Configuration reference
 
 | Option | Purpose |
 | --- | --- |
-| `ExpirationScanFrequency` | Minimum interval between expired-entry cleanup runs. A zero or negative value schedules the next run for the soonest upcoming expiration. |
-| `EvictionPolicy` | Policy used when size-limit eviction or manual compaction needs to select entries. |
-| `SizeLimitGiB` | Cache size limit expressed in GiB. |
-| `SizeLimitMiB` | Cache size limit expressed in MiB. |
-| `SizeLimitBytes` | Cache size limit expressed in bytes. |
-| `DefaultSlidingExpiration` | Default sliding expiration for items without one. |
-| `DefaultAbsoluteExpirationRelativeToNow` | Default Time To Live for items an absolute expiry set. Calculated from the time the item is added to the cache. |
+| `EvictionPolicy` | Selection policy for capacity eviction and compaction. |
+| `SizeLimitBytes` | Maximum configured cache size in bytes. |
+| `SizeLimitMiB` / `SizeLimitGiB` | Alternative units for configuring the byte limit. |
+| `ExpirationScanFrequency` | Minimum interval between expiry cleanup runs; zero or a negative value schedules the next run for the soonest upcoming expiration. |
+| `DefaultSlidingExpiration` | Default sliding expiry where an entry does not specify one. |
+| `DefaultAbsoluteExpirationRelativeToNow` | Default relative absolute expiry, calculated when an entry is added. |
 
-<!-- INSTRUCTIONS PLACEHOLDER: Insert a verified, compilable AddDistributedFileCache(options => ...) example, including the actual option type, property names, and defaults. Explain how multiple size-limit properties interact if more than one is set. -->
+## Operational boundaries
 
-## Operational behavior
+- **One process owns one cache.** Do not share the cache directory or assume another process can observe its entries safely.
+- **Storage is temporary.** The cache creates a temporary folder under the current user's temp directory at startup and removes it during normal shutdown. Crashes or forced termination may leave files behind; do not rely on shutdown cleanup for durability or guaranteed reclamation.
+- **Misses are expected.** Cached values must be safe to lose and regenerable after expiration, eviction, restart, or storage failure.
+- **Filesystem access matters.** The process needs permission to create, read, write, and delete files in its temp directory. A configured cache-size limit does not protect against another workload filling the underlying filesystem.
+- **Write failures:** If the filesystem rejects a write, the entry is not added and an error is logged. Callers should not treat `Set` as proof that the entry can later be read back.
 
-- **Storage:** Cache files live in a temporary directory under the current user's temp folder. Normal application shutdown removes them.
-- **Durability:** Treat entries as disposable. Applications must handle misses and be able to recreate their values; this is not persistent storage.
-- **Permissions:** The process needs permission to create, read, write, and delete files in its temporary directory.
-- **Abrupt termination:** Files may remain after a crash or forced shutdown. Do not assume cleanup always runs.
-- **Write failures:** If the filesystem rejects a write, the entry is not added and an error is logged. Callers should not treat `Set` as proof that the entry can later be read back without checking the actual failure behavior.
-- **Multiple processes:** Do not assume the same cache directory or cache state can be shared safely across processes. Each process should be treated as having an independent cache.
+## Soak Benchmarks
 
-<!-- INSTRUCTIONS PLACEHOLDER: Document the exact temp-directory naming scheme and a safe stale-file cleanup procedure after inspecting the implementation. -->
-<!-- INSTRUCTIONS PLACEHOLDER: Document any exception/logging behavior and the response to a full or read-only disk based on tests. -->
+The benchmark that matters most for this package is **sustained operation while the cache is already full**: this tests the cost of making room, not just writing into an empty directory. The figures below are useful directional evidence, not a cross-machine performance guarantee.
 
-## What this is not
+- PayloadSize=1 byte
+- CacheSizeLimit=300
+- InvocationCount=300
+- IterationCount=5
+- UnrollFactor=1  
+- WarmupCount=1
 
-The interface name can be misleading: `IDistributedCache` describes the API, not a guarantee that every implementation shares state between processes. This package is intended as a local cache. It should not be marketed as Redis-compatible in deployment semantics, a durable database, or an automatic RAM-to-disk overspill engine unless the implementation and measurements substantiate those claims.
+Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDistributedCache/tree/main/src/Extensions.Caching.FileSystem.Tests/Benchmark/BenchmarkTests.cs)
 
-## Performance and benchmarks
+### [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
+| Method     | Mean      | Error     | StdDev    |
+|----------- |----------:|----------:|----------:|
+| Write      | 505.73 us |  97.77 us | 15.130 us |
+| WriteAsync | 620.54 us | 236.39 us | 61.390 us |
+| Read       |  52.02 us |  13.57 us |  3.523 us |
+| ReadAsync  | 140.60 us |  27.10 us |  7.038 us |
 
-The useful question is not just “How fast is a hit?” It is “How does the cache behave when it expires entries, fills its size budget, and serves concurrent requests?” Publish results with benchmark code, machine specifications, .NET version, filesystem, storage medium, and cache settings so readers can reproduce them.
 
-#### Benchmark: Read/Write
-Add an item and immediately read it.
+### [Net.DistributedFileStoreCache](https://www.nuget.org/packages/Net.DistributedFileStoreCache)
+| Method     | Mean          | Error         | StdDev       |
+|----------- |--------------:|--------------:|-------------:|
+| Write      | 179,946.73 ns | 24,628.184 ns | 6,395.861 ns |
+| WriteAsync | 236,976.73 ns | 17,474.210 ns | 4,537.997 ns |
+| Read       |      74.40 ns |     28.893 ns |     7.503 ns |
+| ReadAsync  |     209.08 ns |      8.319 ns |     1.287 ns |
 
-- How many items? 1000
 
-| Payload size| Type | Percentile| Time (ms)|
-| --- | --- | --- | --- |
-| 1 byte | write | P01 | 0.372 ms |
-|        |       | P10 | 0.406 ms |
-|        |       | P50 | 0.449 ms |
-|        |       | P95 | 0.612 ms |
-|        |       | P99 | 0.803 ms |
-| 1 byte | read | P01 | 0.065 ms |
-|        |      | P10 | 0.071 ms |
-|        |      | P50 | 0.086 ms |
-|        |      | P95 | 0.129 ms |
-|        |      | P99 | 0.190 ms |
-| 1 KiB | write | P01 | 0.371 ms |
-|       |       | P10 | 0.390 ms |
-|       |       | P50 | 0.437 ms |
-|       |       | P95 | 0.650 ms |
-|       |       | P99 | 1.958 ms |
-| 1 KiB | read | P01 | 0.701 ms |
-|       |      | P10 | 0.738 ms |
-|       |      | P50 | 0.808 ms |
-|       |      | P95 | 1.016 ms |
-|       |      | P99 | 1.137 ms |
+### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
+> 1us == 1000ns
 
-#### Benchmark: Full-cache churn
-Set a fixed size limit; keep adding entries beyond its limit so that items are auto evicted to make room for new ones;
-
-- How many items added after the cache is full? 1000
-- Payload size? 1 byte
-
-| EvictionPolicy | Percentile| Time (ms)|
-| --- | --- | --- |
-| FIFO | P01 | 0.372 ms |
-|      | P10 | 0.406 ms |
-|      | P50 | 0.449 ms |
-|      | P95 | 0.612 ms |
-|      | P99 | 0.803 ms |
-| LFU | P01 | 0.361 ms |
-|     | P10 | 0.396 ms |
-|     | P50 | 0.441 ms |
-|     | P95 | 0.616 ms |
-|     | P99 | 0.960 ms |
-| LRU | P01 | 0.386 ms |
-|     | P10 | 0.417 ms |
-|     | P50 | 0.451 ms |
-|     | P95 | 0.651 ms |
-|     | P99 | 0.949 ms |
-| TTL | P01 | 0.363 ms |
-|     | P10 | 0.401 ms |
-|     | P50 | 0.443 ms |
-|     | P95 | 0.638 ms |
-|     | P99 | 0.928 ms |
-
+| Method     | Mean       | Error     | StdDev   |
+|----------- |-----------:|----------:|---------:|
+| Write      | 1,054.7 us | 341.63 us | 52.87 us |
+| WriteAsync | 1,049.8 us | 235.54 us | 36.45 us |
+| Read       |   150.8 us |  40.47 us | 10.51 us |
+| ReadAsync  |   205.4 us |  15.04 us |  3.91 us |

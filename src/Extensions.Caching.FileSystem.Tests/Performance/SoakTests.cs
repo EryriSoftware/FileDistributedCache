@@ -1,13 +1,14 @@
 ﻿using System.Diagnostics;
 using System.Security.Cryptography;
-using FluentAssertions;
+using Eryri.Extensions.Caching.FileSystem.Tests.Contexts;
 using Microsoft.Extensions.Caching.Distributed;
 
 namespace Eryri.Extensions.Caching.FileSystem.Tests.Performance;
 
 [TestFixture, Parallelizable(ParallelScope.All)]
-public class FullCacheChurnTests : PerformanceTestsBase
+public class SoakTests
 {
+    protected const int EntriesCount = 1000;
     protected const int PayloadSize = 1;
     protected const int CacheSizeLimit = PayloadSize * 10;
     protected readonly byte[] Payload = RandomNumberGenerator.GetBytes(PayloadSize);
@@ -17,7 +18,6 @@ public class FullCacheChurnTests : PerformanceTestsBase
     {
         // Arrange
         using var ctx = new CacheContext(evictionPolicy: evictionPolicy, sizeLimitBytes: CacheSizeLimit);
-        var ticks = new long[EntriesCount];
         var options = new DistributedCacheEntryOptions
         {
             AbsoluteExpiration = ctx.Now.AddDays(1)
@@ -28,21 +28,13 @@ public class FullCacheChurnTests : PerformanceTestsBase
             ctx.Cache.Set(Guid.NewGuid().ToString("N"), Payload, options);
         });
 
-        ctx.Cache.Size.Should().Be(CacheSizeLimit);
-
         // Act
-        for (int i = 0; i < ticks.Length; i++)
+        // Assert
+        Parallel.For(0, EntriesCount, i =>
         {
             var key = Guid.NewGuid().ToString("N");
-            long start = Stopwatch.GetTimestamp();
-
             ctx.Cache.Set(key, Payload, options);
-
-            ticks[i] = Stopwatch.GetTimestamp() - start;
-        }
-
-        // Assert
-        PrintLatency(ticks);
+        });
     }
 
     [Test]
@@ -50,7 +42,6 @@ public class FullCacheChurnTests : PerformanceTestsBase
     {
         // Arrange
         using var ctx = new CacheContext(evictionPolicy: evictionPolicy, sizeLimitBytes: CacheSizeLimit);
-        var ticks = new long[EntriesCount];
         var options = new DistributedCacheEntryOptions
         {
             AbsoluteExpiration = ctx.Now.AddDays(1)
@@ -61,20 +52,12 @@ public class FullCacheChurnTests : PerformanceTestsBase
             ctx.Cache.Set(Guid.NewGuid().ToString("N"), Payload, options);
         });
 
-        ctx.Cache.Size.Should().Be(CacheSizeLimit);
-
         // Act
-        for (int i = 0; i < ticks.Length; i++)
+        // Assert
+        await Parallel.ForAsync(0, EntriesCount, TestContext.CurrentContext.CancellationToken, async (i, ct) =>
         {
             var key = Guid.NewGuid().ToString("N");
-            long start = Stopwatch.GetTimestamp();
-
-            await ctx.Cache.SetAsync(key, Payload, options, TestContext.CurrentContext.CancellationToken);
-
-            ticks[i] = Stopwatch.GetTimestamp() - start;
-        }
-
-        // Assert
-        PrintLatency(ticks);
+            await ctx.Cache.SetAsync(key, Payload, options, ct);
+        });
     }
 }
