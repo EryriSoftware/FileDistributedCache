@@ -19,6 +19,7 @@ public static class ServiceCollectionExtensions
         /// <returns>The <see cref="IServiceCollection"/> so that additional calls can be chained.</returns>
         public IServiceCollection AddDistributedFileCache()
         {
+            services.TryAddSingleton(TimeProvider.System);
             services.AddOptionsWithValidateOnStart<FileCacheOptions>(nameof(FileCacheOptions));
             services.TryAddSingleton<FileDistributedCache>();
             services.TryAddSingleton<IFileDistributedCache>(sp => sp.GetRequiredService<FileDistributedCache>());

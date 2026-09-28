@@ -9,6 +9,7 @@
 		<VerifyReferenceTrimCompatibility>true</VerifyReferenceTrimCompatibility>
 
 		<!-- NuGet Package Metadata -->
+		<Version>1.0.1</Version>
 		<PackageId>Eryri.FileDistributedCache</PackageId>
 		<Authors>Osian Linton</Authors>
 		<Description>Local filesystem-backed IDistributedCache and IBufferedDistributedCache for single-process .NET applications with limited RAM.</Description>

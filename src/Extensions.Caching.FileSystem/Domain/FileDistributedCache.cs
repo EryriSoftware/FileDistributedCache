@@ -15,7 +15,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     public FileDistributedCache(
         TimeProvider timeProvider,
         IOptions<FileCacheOptions> optionsAccessor,
-        ILogger<FileDistributedCache> logger)
+        ILogger<FileDistributedCache>? logger = null)
     {
         this.timeProvider = timeProvider;
         this.options = optionsAccessor.Value;
@@ -25,7 +25,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     }
 
     private bool isDisposed = false;
-    private readonly ILogger logger;
+    private readonly ILogger? logger;
     private readonly FileCacheOptions options;
     private readonly TimeProvider timeProvider;
     private readonly DirectoryInfo cacheDirectory = Directory.CreateTempSubdirectory();
@@ -47,7 +47,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             }
             catch (Exception ex)
             {
-                logger.LogCritical(ex, "Failed to read cache file");
+                logger?.LogCritical(ex, "Failed to read cache file");
                 return false;
             }
         }
@@ -78,7 +78,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             }
             catch (Exception ex)
             {
-                logger.LogCritical(ex, "Failed to read cache file");
+                logger?.LogCritical(ex, "Failed to read cache file");
                 return false;
             }
         }
@@ -110,7 +110,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         catch (Exception ex)
         {
             TryDelete(entry.Path);
-            logger.LogCritical(ex, "Failed to write cache file");
+            logger?.LogCritical(ex, "Failed to write cache file");
         }
     }
 
@@ -130,7 +130,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         catch (Exception ex)
         {
             TryDelete(entry.Path);
-            logger.LogCritical(ex, "Failed to write cache file");
+            logger?.LogCritical(ex, "Failed to write cache file");
         }
     }
 
@@ -204,7 +204,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         }
         catch (Exception ex)
         {
-            logger.LogCritical(ex, "Failed to delete cache file");
+            logger?.LogCritical(ex, "Failed to delete cache file");
         }
     }
 
