@@ -32,7 +32,7 @@ public class BenchmarkTests
             {
                 d.PathToCacheFileDirectory = cacheDirectory.FullName;
                 d.SecondPartOfCacheFileName = "cache";
-                d.MaxBytesInJsonCacheFile = Convert.ToInt32(SizeLimit);
+                d.MaxBytesInJsonCacheFile = SizeLimit;
                 d.WhichVersion = Net.DistributedFileStoreCache.FileStoreCacheVersions.IDistributedCache;
             });
         }
@@ -45,7 +45,7 @@ public class BenchmarkTests
             FileDistributedCacheServiceCollectionExtensions.AddFileDistributedCache(services, d =>
             {
                 d.CacheDirectory = cacheDirectory.FullName;
-                d.MaxTotalSize = Convert.ToInt64(SizeLimit);
+                d.MaxTotalSize = SizeLimit;
             });
         }
     }
@@ -54,11 +54,12 @@ public class BenchmarkTests
     [SimpleJob(
         warmupCount: 1,
         iterationCount: 5,
-        invocationCount: (int)SizeLimit * PayloadSize)]
+        invocationCount: NumberOfItemsUntilFull)]
     public abstract class TestBase : IDisposable
     {
-        public const long SizeLimit = 300;
-        public const int PayloadSize = 1;
+        public const int NumberOfItemsUntilFull = SizeLimit / PayloadSize;
+        public const int PayloadSize = 4 << 10; // 4 KiB
+        public const int SizeLimit = 1 << 20; // 1 MiB
         protected readonly DirectoryInfo cacheDirectory = Directory.CreateTempSubdirectory();
         private string key = Guid.NewGuid().ToString("N");
         private readonly byte[] payload = RandomNumberGenerator.GetBytes(PayloadSize);
@@ -111,7 +112,6 @@ public class BenchmarkTests
         {
             if (cache!.Get(key) == null)
             {
-                Guid.NewGuid().ToString("N");
                 cache!.Set(key, payload);
             }
         }
@@ -121,7 +121,6 @@ public class BenchmarkTests
         {
             if (await cache!.GetAsync(key) == null)
             {
-                Guid.NewGuid().ToString("N");
                 await cache!.SetAsync(key, payload);
             }
         }
