@@ -10,24 +10,10 @@ internal class FileCacheMetadata(EvictionPolicy policy)
     public long Size => Interlocked.Read(ref _size);
     private object queueLock = new ();
     private readonly ConcurrentDictionary<string, FileCacheEntry> files = new (StringComparer.OrdinalIgnoreCase);
-    private readonly PriorityQueue<Candidate, DateTimeOffsetPriority> lruQueue = new ();
-    private readonly PriorityQueue<Candidate, int> lfuQueue = new ();
-    private readonly PriorityQueue<Candidate, DateTimeOffsetPriority> ttlQueue = new ();
-    private readonly ConcurrentQueue<Candidate> fifoQueue = new ();
-    private readonly record struct Candidate(string Key, long Version);
-    private readonly record struct DateTimeOffsetPriority(DateTimeOffset Value) : IComparable<DateTimeOffsetPriority>
-    {
-        private static long CurrentSequence = 0;
-        public long Sequence { get; } = Interlocked.Increment(ref CurrentSequence);
-        public int CompareTo(DateTimeOffsetPriority other)
-        {
-            var timeComparison = Value.CompareTo(other.Value);
-
-            return timeComparison != 0
-                ? timeComparison
-                : Sequence.CompareTo(other.Sequence);
-        }
-    }
+    private readonly PriorityQueue<PriorityCandidate, PriorityDateTimeOffset> lruQueue = new ();
+    private readonly PriorityQueue<PriorityCandidate, int> lfuQueue = new ();
+    private readonly PriorityQueue<PriorityCandidate, PriorityDateTimeOffset> ttlQueue = new ();
+    private readonly ConcurrentQueue<PriorityCandidate> fifoQueue = new ();
 
     public void Clear()
     {
@@ -92,16 +78,16 @@ internal class FileCacheMetadata(EvictionPolicy policy)
 
     private void Enqueue(FileCacheEntry value)
     {
-        var candidate = new Candidate(Key: value.Key, Version: value.Version);
+        var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
         lock (queueLock)
         {
-            ttlQueue.Enqueue(candidate, new DateTimeOffsetPriority(value.Expiration ?? DateTimeOffset.MaxValue));
+            ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.Expiration ?? DateTimeOffset.MaxValue));
             switch (policy)
             {
                 case EvictionPolicy.TTL:
                     break; // TTL queue is always tracked
                 case EvictionPolicy.LRU:
-                    lruQueue.Enqueue(candidate, new DateTimeOffsetPriority(value.LastAccessUtc));
+                    lruQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.LastAccessUtc));
                     break;
                 case EvictionPolicy.LFU:
                     lfuQueue.Enqueue(candidate, value.AccessCount);
@@ -117,14 +103,14 @@ internal class FileCacheMetadata(EvictionPolicy policy)
 
     public void EnqueueTtl(FileCacheEntry value)
     {
-        var candidate = new Candidate(Key: value.Key, Version: value.Version);
+        var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
         lock (queueLock)
         {
-            ttlQueue.Enqueue(candidate, new DateTimeOffsetPriority(value.Expiration ?? DateTimeOffset.MaxValue));
+            ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.Expiration ?? DateTimeOffset.MaxValue));
         }
     }
 
-    private bool TryDequeueCandidate(EvictionPolicy policy, out Candidate candidate)
+    private bool TryDequeueCandidate(EvictionPolicy policy, out PriorityCandidate candidate)
     {
         lock (queueLock)
         {

@@ -9,11 +9,11 @@
 		<VerifyReferenceTrimCompatibility>true</VerifyReferenceTrimCompatibility>
 
 		<!-- NuGet Package Metadata -->
-		<Version>1.0.1</Version>
+		<Version>1.0.2</Version>
 		<PackageId>Eryri.FileDistributedCache</PackageId>
 		<Authors>Osian Linton</Authors>
-		<Description>Local filesystem-backed IDistributedCache and IBufferedDistributedCache for single-process .NET applications with limited RAM.</Description>
-		<PackageTags>caching;cache;file-cache;distributed-cache;filesystem;hybridcache;idistributedcache;ibuffereddistributedcache</PackageTags>
+		<Description>High performance disposable cache, using local disk for more capacity without allocating more RAM or running a cache service. A single-process, filesystem-backed IDistributedCache and IBufferDistributedCache with expiration and automatic byte-limit eviction. Not shared or durable.</Description>
+		<PackageTags>caching;IDistributedCache;IBufferDistributedCache;HybridCache;file-cache;filesystem-cache;disk-cache;local-cache;secondary-cache;cache-eviction;LRU;LFU;FIFO;TTL;native-aot</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageProjectUrl>https://github.com/EryriSoftware/FileDistributedCache</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/EryriSoftware/FileDistributedCache</RepositoryUrl>

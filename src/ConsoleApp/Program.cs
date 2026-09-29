@@ -13,7 +13,9 @@ var key = Guid.NewGuid().ToString("N");
 var payload = Guid.NewGuid().ToString("N");
 var options = new HybridCacheEntryOptions
 {
-    Flags = HybridCacheEntryFlags.DisableLocalCache
+    Expiration = TimeSpan.FromMinutes(10),
+    LocalCacheExpiration = TimeSpan.FromSeconds(5),
+    Flags = HybridCacheEntryFlags.DisableLocalCache // Disables the 'IMemoryCache' for the purpose of thie example
 };
 
 // Act

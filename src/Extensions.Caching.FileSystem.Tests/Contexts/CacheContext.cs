@@ -1,14 +1,16 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 
-namespace Eryri.Extensions.Caching.FileSystem.Tests;
+namespace Eryri.Extensions.Caching.FileSystem.Tests.Contexts;
 
 internal class CacheContext : IDisposable
 {
     private readonly ServiceProvider Services;
     public DateTimeOffset Now => TimeProvider.GetUtcNow();
     public FakeTimeProvider TimeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
-    public IFileDistributedCache Cache => field ??= Services.GetRequiredService<IFileDistributedCache>();
+    public IDistributedCache Cache => field ??= Services.GetRequiredService<IDistributedCache>();
+    public IFileDistributedCache FileCache => field ??= Services.GetRequiredService<IFileDistributedCache>();
 
     public CacheContext(EvictionPolicy evictionPolicy = EvictionPolicy.LRU, int? sizeLimitBytes = null) =>
        Services = new ServiceCollection()
