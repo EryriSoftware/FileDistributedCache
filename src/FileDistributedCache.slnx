@@ -7,7 +7,7 @@
     <File Path="stylecop.json" />
     <File Path="StyleCop.ruleset" />
   </Folder>
-  <Project Path="ConsoleApp/ConsoleApp.csproj" Id="ce47b736-60f7-4752-bb68-a65ec0cf6350" />
+  <Project Path="SampleConsoleApp/SampleConsoleApp.csproj" Id="ce47b736-60f7-4752-bb68-a65ec0cf6350" />
   <Project Path="Extensions.Caching.FileSystem.Tests/Extensions.Caching.FileSystem.Tests.csproj" />
   <Project Path="Extensions.Caching.FileSystem/Extensions.Caching.FileSystem.csproj" />
 </Solution>
