@@ -258,7 +258,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         {
             Encoding.UTF8.GetBytes(key, buffer);
             SHA256.HashData(buffer.AsSpan(0, bufferLength), hash);
-            return $"{Convert.ToHexStringLower(hash, 0, SHA256.HashSizeInBytes)}{Guid.NewGuid():N}";
+            return $"{Convert.ToHexStringLower(hash, 0, SHA256.HashSizeInBytes)}{Guid.NewGuid():N}.bytes";
         }
         finally
         {

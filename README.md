@@ -131,43 +131,53 @@ For manual capacity reduction, `IFileDistributedCache.Compact(decimal percentage
 - **Filesystem access matters.** The process needs permission to create, read, write, and delete files in its temp directory. A configured cache-size limit does not protect against another workload filling the underlying filesystem.
 - **Write failures:** If the filesystem rejects a write, the entry is not added and an error is logged. Callers should not treat `Set` as proof that the entry can later be read back.
 
-## Soak Benchmarks
+## Benchmarks
 
-The benchmark that matters most for this package is **sustained operation while the cache is already full**: this tests the cost of making room, not just writing into an empty directory. The figures below are useful directional evidence, not a cross-machine performance guarantee.
+The benchmark that matters most for this package is **sustained operation with realistic workloads while the cache is already full**: this tests the cost of making room, not just writing into an empty directory. The figures below are useful directional evidence, not a cross-machine performance guarantee.
 
-- PayloadSize=1 byte
-- CacheSizeLimit=300
-- InvocationCount=300
+- PayloadSize=4KiB
+- CacheSizeLimit=1MiB
+- InvocationCount=256 // number of items to fill the cache
 - IterationCount=5
 - UnrollFactor=1  
 - WarmupCount=1
 
 Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDistributedCache/blob/main/src/Extensions.Caching.FileSystem.Tests/Performance/BenchmarkTests.cs)
+> 1s == 1000ms, 1ms == 1000us, 1us == 1000ns
 
 ### [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
-| Method     | Mean      | Error     | StdDev    |
-|----------- |----------:|----------:|----------:|
-| Write      | 505.73 us |  97.77 us | 15.130 us |
-| WriteAsync | 620.54 us | 236.39 us | 61.390 us |
-| Read       |  52.02 us |  13.57 us |  3.523 us |
-| ReadAsync  | 140.60 us |  27.10 us |  7.038 us |
+| Method     | Mean     | Error     | StdDev   |
+|----------- |---------:|----------:|---------:|
+| Write      | 469.1 us | 187.86 us | 48.79 us |
+| WriteAsync | 556.5 us | 262.33 us | 40.60 us |
+| Read       | 207.8 us | 150.26 us | 39.02 us |
+| ReadAsync  | 285.3 us |  53.24 us |  8.24 us |
 
+> [!Note]
+> This cache is designed for single-process use.
 
 ### [Net.DistributedFileStoreCache](https://www.nuget.org/packages/Net.DistributedFileStoreCache)
-| Method     | Mean          | Error         | StdDev       |
-|----------- |--------------:|--------------:|-------------:|
-| Write      | 179,946.73 ns | 24,628.184 ns | 6,395.861 ns |
-| WriteAsync | 236,976.73 ns | 17,474.210 ns | 4,537.997 ns |
-| Read       |      74.40 ns |     28.893 ns |     7.503 ns |
-| ReadAsync  |     209.08 ns |      8.319 ns |     1.287 ns |
+| Method     | Mean          | Error      | StdDev      |
+|----------- |--------------:|-----------:|------------:|
+| Write      | 10,094.749 us | 517.489 us |  80.0820 us |
+| WriteAsync | 10,164.613 us | 573.764 us | 149.0046 us |
+| Read       |      9.998 us |  11.127 us |   2.8895 us |
+| ReadAsync  |      8.556 us |   5.697 us |   0.8817 us |
+
+> [!Warning]
+> Retains the entire cache in-memory. The filesystem is used as persistance/distribution mechanism.
 
 
 ### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
-> 1us == 1000ns
+| Method     | Mean       | Error       | StdDev    |
+|----------- |-----------:|------------:|----------:|
+| Write      | 1,396.8 us |   313.64 us |  81.45 us |
+| WriteAsync | 1,883.4 us | 4,277.72 us | 661.98 us |
+| Read       |   159.2 us |    28.91 us |   4.47 us |
+| ReadAsync  |   242.7 us |   110.13 us |  17.04 us |
 
-| Method     | Mean       | Error     | StdDev   |
-|----------- |-----------:|----------:|---------:|
-| Write      | 1,054.7 us | 341.63 us | 52.87 us |
-| WriteAsync | 1,049.8 us | 235.54 us | 36.45 us |
-| Read       |   150.8 us |  40.47 us | 10.51 us |
-| ReadAsync  |   205.4 us |  15.04 us |  3.91 us |
+> [!Note]
+> This cache is designed for single-process use.
+
+> [!Warning]
+> Size limits are eventual, not strict. Write methods publishes without checking MaxTotalSize or MaxEntries; eviction only acts on its periodic scan.
