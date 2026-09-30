@@ -146,21 +146,23 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 > 1s == 1000ms, 1ms == 1000us, 1us == 1000ns
 
 ### [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
-| Method     | Mean     | Error       | StdDev    |
-|----------- |---------:|------------:|----------:|
-| Write      | 728.3 us | 2,951.03 us | 456.67 us |
-| WriteAsync | 770.2 us |    93.77 us |  14.51 us |
-| Read       | 196.6 us |    34.37 us |   8.92 us |
-| ReadAsync  | 285.4 us |    39.48 us |   6.11 us |
+| Method     | Mean     | Error     | StdDev   |
+|----------- |---------:|----------:|---------:|
+| Write      | 469.1 us | 187.86 us | 48.79 us |
+| WriteAsync | 556.5 us | 262.33 us | 40.60 us |
+| Read       | 207.8 us | 150.26 us | 39.02 us |
+| ReadAsync  | 285.3 us |  53.24 us |  8.24 us |
 
+> [!Note]
+> This cache is designed for single-process use.
 
 ### [Net.DistributedFileStoreCache](https://www.nuget.org/packages/Net.DistributedFileStoreCache)
-| Method     | Mean          | Error        | StdDev     |
-|----------- |--------------:|-------------:|-----------:|
-| Write      | 11,099.327 us | 3,463.743 us | 536.018 us |
-| WriteAsync | 10,244.779 us | 3,165.580 us | 489.877 us |
-| Read       |      9.701 us |     5.999 us |   1.558 us |
-| ReadAsync  |     10.882 us |     8.486 us |   2.204 us |
+| Method     | Mean          | Error      | StdDev      |
+|----------- |--------------:|-----------:|------------:|
+| Write      | 10,094.749 us | 517.489 us |  80.0820 us |
+| WriteAsync | 10,164.613 us | 573.764 us | 149.0046 us |
+| Read       |      9.998 us |  11.127 us |   2.8895 us |
+| ReadAsync  |      8.556 us |   5.697 us |   0.8817 us |
 
 > [!Warning]
 > Retains the entire cache in-memory. The filesystem is used as persistance/distribution mechanism.
@@ -169,10 +171,13 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 ### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
 | Method     | Mean       | Error       | StdDev    |
 |----------- |-----------:|------------:|----------:|
-| Write      | 1,510.4 us |   507.98 us | 131.92 us |
-| WriteAsync | 2,020.1 us | 2,741.17 us | 424.20 us |
-| Read       |   223.4 us |    48.21 us |  12.52 us |
-| ReadAsync  |   293.0 us |    94.60 us |  24.57 us |
+| Write      | 1,396.8 us |   313.64 us |  81.45 us |
+| WriteAsync | 1,883.4 us | 4,277.72 us | 661.98 us |
+| Read       |   159.2 us |    28.91 us |   4.47 us |
+| ReadAsync  |   242.7 us |   110.13 us |  17.04 us |
+
+> [!Note]
+> This cache is designed for single-process use.
 
 > [!Warning]
 > Size limits are eventual, not strict. Write methods publishes without checking MaxTotalSize or MaxEntries; eviction only acts on its periodic scan.
