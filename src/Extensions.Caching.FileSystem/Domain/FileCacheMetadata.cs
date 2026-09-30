@@ -96,7 +96,7 @@ internal class FileCacheMetadata(EvictionPolicy policy)
                     fifoQueue.Enqueue(candidate);
                     break;
                 default:
-                    throw new NotImplementedException($"Eviction policy {policy} is not implemented.");
+                    throw new NotImplementedException(policy.ToString());
             }
         }
     }
@@ -120,7 +120,7 @@ internal class FileCacheMetadata(EvictionPolicy policy)
                 EvictionPolicy.LRU => lruQueue.TryDequeue(out candidate, out _),
                 EvictionPolicy.LFU => lfuQueue.TryDequeue(out candidate, out _),
                 EvictionPolicy.FIFO => fifoQueue.TryDequeue(out candidate),
-                _ => throw new ArgumentOutOfRangeException(nameof(policy))
+                _ => throw new NotImplementedException(policy.ToString())
             };
         }
     }
