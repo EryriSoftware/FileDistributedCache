@@ -1,7 +1,6 @@
 ﻿using System.Buffers;
+using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
-using System.Security.Cryptography;
-using System.Text;
 using Eryri.Extensions.Caching.FileSystem.Extensions;
 using Eryri.Extensions.Caching.FileSystem.Models;
 using Microsoft.Extensions.Caching.Distributed;
@@ -22,13 +21,16 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         this.logger = logger;
         cleanupTimer = timeProvider.CreateTimer(_ => RemoveExpired(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         metadata = new FileCacheMetadata(optionsAccessor.Value.EvictionPolicy);
+        cacheDirectory = Directory.CreateTempSubdirectory();
     }
 
+    private readonly ConcurrentDictionary<string, DirectoryInfo> directories = new (StringComparer.OrdinalIgnoreCase);
+    private const int ShardingDepth = 3;
     private bool isDisposed = false;
     private readonly ILogger? logger;
     private readonly FileCacheOptions settings;
     private readonly TimeProvider timeProvider;
-    private readonly DirectoryInfo cacheDirectory = Directory.CreateTempSubdirectory();
+    private readonly DirectoryInfo cacheDirectory;
     private readonly FileCacheMetadata metadata;
     private DateTimeOffset nextCleanup = DateTimeOffset.MaxValue;
     private readonly ITimer cleanupTimer;
@@ -263,20 +265,22 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     private FileCacheEntry CreateFileEntry(string key, long payloadSize, DistributedCacheEntryOptions options)
     {
+        var id = Guid.NewGuid().ToString("N");
         var now = timeProvider.GetUtcNow();
+        var shard = id[..ShardingDepth];
+        var path = Path.Combine(cacheDirectory.FullName, shard, $"{id}.bytes");
+        directories.GetOrAdd(shard, static (shard, root) => Directory.CreateDirectory(Path.Combine(root.FullName, shard)), cacheDirectory);
         return new FileCacheEntry(
             Key: key,
-            Path: Path.Combine(cacheDirectory.FullName, $"{Guid.NewGuid():N}.bytes"),
+            Path: path,
             SizeBytes: payloadSize,
             CreatedUtc: now,
             LastAccessUtc: now)
         {
-            AbsoluteExpiration = options.AbsoluteExpirationRelativeToNow.HasValue
-                ? now.Add(options.AbsoluteExpirationRelativeToNow.Value)
-                : options.AbsoluteExpiration.HasValue
+            AbsoluteExpiration = options.AbsoluteExpiration.HasValue
                 ? options.AbsoluteExpiration
-                : settings.DefaultSlidingExpiration.HasValue
-                ? now.Add(settings.DefaultSlidingExpiration.Value)
+                : options.AbsoluteExpirationRelativeToNow.HasValue
+                ? now.Add(options.AbsoluteExpirationRelativeToNow.Value)
                 : null,
             SlidingExpiration = options.SlidingExpiration ?? settings.DefaultSlidingExpiration
         };

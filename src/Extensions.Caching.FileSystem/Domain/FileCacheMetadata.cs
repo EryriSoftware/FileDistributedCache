@@ -81,7 +81,11 @@ internal class FileCacheMetadata(EvictionPolicy policy)
         var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
         lock (queueLock)
         {
-            ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.Expiration ?? DateTimeOffset.MaxValue));
+            if (value.Expiration.HasValue)
+            {
+                ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.Expiration.Value));
+            }
+
             switch (policy)
             {
                 case EvictionPolicy.TTL:
@@ -103,10 +107,13 @@ internal class FileCacheMetadata(EvictionPolicy policy)
 
     public void EnqueueTtl(FileCacheEntry value)
     {
-        var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
-        lock (queueLock)
+        if (value.Expiration.HasValue)
         {
-            ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.Expiration ?? DateTimeOffset.MaxValue));
+            var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
+            lock (queueLock)
+            {
+                ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.Expiration.Value));
+            }
         }
     }
 

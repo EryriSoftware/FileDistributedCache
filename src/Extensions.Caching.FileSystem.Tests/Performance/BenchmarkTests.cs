@@ -13,8 +13,6 @@ public class BenchmarkTests
     [Test]
     public void Run_Eryri_FileDistributedCache_Tests() => BenchmarkRunner.Run<Eryri_FileDistributedCache_Tests>();
     [Test]
-    public void Run_Net_DistributedFileStoreCache_Tests() => BenchmarkRunner.Run<Net_DistributedFileStoreCache_Tests>();
-    [Test]
     public void Run_DamianH_FileDistributedCache_Tests() => BenchmarkRunner.Run<DamianH_FileDistributedCache_Tests>();
 
     public class Eryri_FileDistributedCache_Tests : TestBase
@@ -22,20 +20,6 @@ public class BenchmarkTests
         public Eryri_FileDistributedCache_Tests()
         {
             services.AddDistributedFileCache(d => d.SizeLimitBytes = SizeLimit);
-        }
-    }
-
-    public class Net_DistributedFileStoreCache_Tests : TestBase
-    {
-        public Net_DistributedFileStoreCache_Tests()
-        {
-            Net.DistributedFileStoreCache.RegisterDistributedFileStoreCache.AddDistributedFileStoreCache(services, d =>
-            {
-                d.PathToCacheFileDirectory = cacheDirectory.FullName;
-                d.SecondPartOfCacheFileName = "cache";
-                d.MaxBytesInJsonCacheFile = SizeLimit;
-                d.WhichVersion = Net.DistributedFileStoreCache.FileStoreCacheVersions.IDistributedCache;
-            });
         }
     }
 
@@ -59,12 +43,17 @@ public class BenchmarkTests
     public abstract class TestBase : IDisposable
     {
         public const int NumberOfItemsUntilFull = SizeLimit / PayloadSize;
-        public const int PayloadSize = 4 << 10; // 4 KiB
+        public const int PayloadSize = 1 << 10; // 1 KiB
         public const int SizeLimit = 1 << 20; // 1 MiB
         protected readonly DirectoryInfo cacheDirectory = Directory.CreateTempSubdirectory();
         private string key = Guid.NewGuid().ToString("N");
         private readonly byte[] payload = RandomNumberGenerator.GetBytes(PayloadSize);
-        private readonly DistributedCacheEntryOptions cacheEntryOptions = new ();
+        private readonly DistributedCacheEntryOptions cacheEntryOptions = new DistributedCacheEntryOptions
+        {
+            AbsoluteExpiration = DateTimeOffset.UtcNow.AddDays(2),
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1),
+            SlidingExpiration = TimeSpan.FromMinutes(10)
+        };
         protected readonly IServiceCollection services = new ServiceCollection();
         private IDisposable? disposable;
         private IDistributedCache? cache;
@@ -99,7 +88,7 @@ public class BenchmarkTests
         public void Set()
         {
             var key = Guid.NewGuid().ToString("N");
-            cache!.Set(key, payload);
+            cache!.Set(key, payload, cacheEntryOptions);
             this.key = key;
         }
 
@@ -115,7 +104,7 @@ public class BenchmarkTests
         public async Task SetAsync()
         {
             var key = Guid.NewGuid().ToString("N");
-            await cache!.SetAsync(key, payload);
+            await cache!.SetAsync(key, payload, cacheEntryOptions);
             this.key = key;
         }
 
@@ -132,7 +121,7 @@ public class BenchmarkTests
         {
             if (cache!.Get(key) == null)
             {
-                cache!.Set(key, payload);
+                cache!.Set(key, payload, cacheEntryOptions);
             }
         }
 
@@ -151,7 +140,7 @@ public class BenchmarkTests
         {
             if (await cache!.GetAsync(key) == null)
             {
-                await cache!.SetAsync(key, payload);
+                await cache!.SetAsync(key, payload, cacheEntryOptions);
             }
         }
 

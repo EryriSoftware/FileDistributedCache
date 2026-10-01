@@ -15,7 +15,6 @@
   <ItemGroup Condition="'$(IsTestProject)'=='true'">
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
 	<PackageVersion Include="DamianH.FileDistributedCache" Version="0.1.1" />
-	<PackageVersion Include="Net.DistributedFileStoreCache" Version="2.0.0" />
     <PackageVersion Include="AutoFixture" Version="4.18.1" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="FluentAssertions" Version="7.2.0" />
