@@ -59,11 +59,23 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     public byte[]? Get(string key)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-
-        return TryGet(key, buffer)
-            ? buffer.WrittenMemory.ToArray()
-            : null;
+        if (metadata.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
+        {
+            UpdateEntry(key, true);
+            try
+            {
+                return File.ReadAllBytes(entry.Path);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogCritical(ex, "Failed to read cache file");
+                return null;
+            }
+        }
+        else
+        {
+            return null;
+        }
     }
 
     public async ValueTask<bool> TryGetAsync(string key, IBufferWriter<byte> destination, CancellationToken cancellationToken)
@@ -90,16 +102,28 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     public async Task<byte[]?> GetAsync(string key, CancellationToken cancellationToken)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-
-        return await TryGetAsync(key, buffer, cancellationToken)
-            ? buffer.WrittenMemory.ToArray()
-            : null;
+        if (metadata.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
+        {
+            UpdateEntry(key, true);
+            try
+            {
+                return await File.ReadAllBytesAsync(entry.Path, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogCritical(ex, "Failed to read cache file");
+                return null;
+            }
+        }
+        else
+        {
+            return null;
+        }
     }
 
     public void Set(string key, ReadOnlySequence<byte> value, DistributedCacheEntryOptions options)
     {
-        var entry = CreateFileEntry(key, value, options);
+        var entry = CreateFileEntry(key, value.Length, options);
         EnsureCapacityFor(entry.SizeBytes);
 
         try
@@ -114,11 +138,26 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         }
     }
 
-    public void Set(string key, byte[] value, DistributedCacheEntryOptions options) => Set(key, new ReadOnlySequence<byte>(value), options);
+    public void Set(string key, byte[] value, DistributedCacheEntryOptions options)
+    {
+        var entry = CreateFileEntry(key, value.Length, options);
+        EnsureCapacityFor(entry.SizeBytes);
+
+        try
+        {
+            File.WriteAllBytes(entry.Path, value);
+            PublishEntry(entry);
+        }
+        catch (Exception ex)
+        {
+            TryDelete(entry.Path);
+            logger?.LogCritical(ex, "Failed to write cache file");
+        }
+    }
 
     public async ValueTask SetAsync(string key, ReadOnlySequence<byte> value, DistributedCacheEntryOptions options, CancellationToken cancellationToken)
     {
-        var entry = CreateFileEntry(key, value, options);
+        var entry = CreateFileEntry(key, value.Length, options);
         EnsureCapacityFor(entry.SizeBytes);
 
         try
@@ -134,8 +173,23 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         }
     }
 
-    public async Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken cancellationToken) =>
-        await SetAsync(key, new ReadOnlySequence<byte>(value), options, cancellationToken);
+    public async Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken cancellationToken)
+    {
+        var entry = CreateFileEntry(key, value.Length, options);
+        EnsureCapacityFor(entry.SizeBytes);
+
+        try
+        {
+            await File.WriteAllBytesAsync(entry.Path, value, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            PublishEntry(entry);
+        }
+        catch (Exception ex)
+        {
+            TryDelete(entry.Path);
+            logger?.LogCritical(ex, "Failed to write cache file");
+        }
+    }
 
     public void Refresh(string key)
     {
@@ -147,12 +201,11 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         while (metadata.TryGetValue(key, out var entry))
         {
             var now = timeProvider.GetUtcNow();
-            var newEntry = entry with { LastAccessUtc = now };
-
-            if (isAccessed)
+            var newEntry = entry with
             {
-                newEntry = newEntry with { AccessCount = newEntry.AccessCount + 1 };
-            }
+                LastAccessUtc = now,
+                AccessCount = isAccessed ? entry.AccessCount + 1 : entry.AccessCount
+            };
 
             if (metadata.TryUpdate(key, newEntry, entry))
             {
@@ -208,13 +261,13 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         }
     }
 
-    private FileCacheEntry CreateFileEntry(string key, ReadOnlySequence<byte> value, DistributedCacheEntryOptions options)
+    private FileCacheEntry CreateFileEntry(string key, long payloadSize, DistributedCacheEntryOptions options)
     {
         var now = timeProvider.GetUtcNow();
         return new FileCacheEntry(
             Key: key,
-            Path: Path.Combine(cacheDirectory.FullName, GetFileName(key)),
-            SizeBytes: value.Length,
+            Path: Path.Combine(cacheDirectory.FullName, $"{Guid.NewGuid():N}.bytes"),
+            SizeBytes: payloadSize,
             CreatedUtc: now,
             LastAccessUtc: now)
         {
@@ -245,25 +298,6 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                 QueueCleanup(entry.Expiration);
                 return;
             }
-        }
-    }
-
-    private static string GetFileName(string key)
-    {
-        var bufferLength = Encoding.UTF8.GetByteCount(key);
-        var buffer = ArrayPool<byte>.Shared.Rent(bufferLength);
-        var hash = ArrayPool<byte>.Shared.Rent(SHA256.HashSizeInBytes);
-
-        try
-        {
-            Encoding.UTF8.GetBytes(key, buffer);
-            SHA256.HashData(buffer.AsSpan(0, bufferLength), hash);
-            return $"{Convert.ToHexStringLower(hash, 0, SHA256.HashSizeInBytes)}{Guid.NewGuid():N}.bytes";
-        }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(buffer);
-            ArrayPool<byte>.Shared.Return(hash);
         }
     }
 

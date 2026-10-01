@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using System.Buffers;
+using System.Security.Cryptography;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 using Microsoft.Extensions.Caching.Distributed;
@@ -63,9 +64,11 @@ public class BenchmarkTests
         protected readonly DirectoryInfo cacheDirectory = Directory.CreateTempSubdirectory();
         private string key = Guid.NewGuid().ToString("N");
         private readonly byte[] payload = RandomNumberGenerator.GetBytes(PayloadSize);
+        private readonly DistributedCacheEntryOptions cacheEntryOptions = new ();
         protected readonly IServiceCollection services = new ServiceCollection();
         private IDisposable? disposable;
         private IDistributedCache? cache;
+        private IBufferDistributedCache? bufferedCache;
 
         [GlobalSetup]
         public void Setup()
@@ -73,6 +76,7 @@ public class BenchmarkTests
             var sp = services.BuildServiceProvider();
             disposable = sp;
             cache = sp.GetRequiredService<IDistributedCache>();
+            bufferedCache = sp.GetService<IBufferDistributedCache>();
         }
 
         [GlobalCleanup]
@@ -92,7 +96,7 @@ public class BenchmarkTests
         }
 
         [Benchmark]
-        public void Write()
+        public void Set()
         {
             var key = Guid.NewGuid().ToString("N");
             cache!.Set(key, payload);
@@ -100,7 +104,15 @@ public class BenchmarkTests
         }
 
         [Benchmark]
-        public async Task WriteAsync()
+        public void SetBuffered()
+        {
+            var key = Guid.NewGuid().ToString("N");
+            bufferedCache!.Set(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
+            this.key = key;
+        }
+
+        [Benchmark]
+        public async Task SetAsync()
         {
             var key = Guid.NewGuid().ToString("N");
             await cache!.SetAsync(key, payload);
@@ -108,7 +120,15 @@ public class BenchmarkTests
         }
 
         [Benchmark]
-        public void Read()
+        public async Task SetBufferedAsync()
+        {
+            var key = Guid.NewGuid().ToString("N");
+            await bufferedCache!.SetAsync(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
+            this.key = key;
+        }
+
+        [Benchmark]
+        public void Get()
         {
             if (cache!.Get(key) == null)
             {
@@ -117,11 +137,31 @@ public class BenchmarkTests
         }
 
         [Benchmark]
-        public async Task ReadAsync()
+        public void GetBuffered()
+        {
+            var buffer = new ArrayBufferWriter<byte>(payload.Length);
+            if (bufferedCache!.TryGet(key, buffer))
+            {
+                bufferedCache!.Set(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
+            }
+        }
+
+        [Benchmark]
+        public async Task GetAsync()
         {
             if (await cache!.GetAsync(key) == null)
             {
                 await cache!.SetAsync(key, payload);
+            }
+        }
+
+        [Benchmark]
+        public async Task GetBufferedAsync()
+        {
+            var buffer = new ArrayBufferWriter<byte>(payload.Length);
+            if (!await bufferedCache!.TryGetAsync(key, buffer))
+            {
+                await bufferedCache!.SetAsync(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
             }
         }
     }

@@ -146,35 +146,47 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 > 1s == 1000ms, 1ms == 1000us, 1us == 1000ns
 
 ### [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
-| Method     | Mean     | Error     | StdDev   |
-|----------- |---------:|----------:|---------:|
-| Write      | 469.1 us | 187.86 us | 48.79 us |
-| WriteAsync | 556.5 us | 262.33 us | 40.60 us |
-| Read       | 207.8 us | 150.26 us | 39.02 us |
-| ReadAsync  | 285.3 us |  53.24 us |  8.24 us |
+| Method           | Mean       | Error     | StdDev    | Median     |
+|----------------- |-----------:|----------:|----------:|-----------:|
+| Set              | 429.339 us | 88.660 us | 23.024 us | 417.403 us |
+| SetBuffered      | 432.104 us | 56.841 us | 14.761 us | 431.577 us |
+| SetAsync         | 480.755 us | 21.653 us |  3.350 us | 480.101 us |
+| SetBufferedAsync | 505.175 us | 65.670 us | 17.054 us | 503.942 us |
+| Get              | 133.681 us |  6.909 us |  1.069 us | 133.859 us |
+| GetBuffered      |   0.637 us |  2.389 us |  0.620 us |   0.255 us |
+| GetAsync         | 189.811 us | 26.941 us |  6.996 us | 185.510 us |
+| GetBufferedAsync | 217.431 us | 17.079 us |  4.435 us | 219.009 us |
 
 > [!Note]
 > This cache is designed for single-process use.
 
 ### [Net.DistributedFileStoreCache](https://www.nuget.org/packages/Net.DistributedFileStoreCache)
-| Method     | Mean          | Error      | StdDev      |
-|----------- |--------------:|-----------:|------------:|
-| Write      | 10,094.749 us | 517.489 us |  80.0820 us |
-| WriteAsync | 10,164.613 us | 573.764 us | 149.0046 us |
-| Read       |      9.998 us |  11.127 us |   2.8895 us |
-| ReadAsync  |      8.556 us |   5.697 us |   0.8817 us |
+| Method           | Mean          | Error      | StdDev     |
+|----------------- |--------------:|-----------:|-----------:|
+| Set              | 10,118.935 us | 823.508 us | 127.439 us |
+| SetBuffered      |            NA |         NA |         NA |
+| SetAsync         |  9,819.364 us | 512.799 us | 133.172 us |
+| SetBufferedAsync |            NA |         NA |         NA |
+| Get              |      9.623 us |  10.795 us |   2.803 us |
+| GetBuffered      |            NA |         NA |         NA |
+| GetAsync         |     12.236 us |   7.482 us |   1.943 us |
+| GetBufferedAsync |            NA |         NA |         NA |
 
 > [!Warning]
 > Retains the entire cache in-memory. The filesystem is used as persistance/distribution mechanism.
 
 
 ### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
-| Method     | Mean       | Error       | StdDev    |
-|----------- |-----------:|------------:|----------:|
-| Write      | 1,396.8 us |   313.64 us |  81.45 us |
-| WriteAsync | 1,883.4 us | 4,277.72 us | 661.98 us |
-| Read       |   159.2 us |    28.91 us |   4.47 us |
-| ReadAsync  |   242.7 us |   110.13 us |  17.04 us |
+| Method           | Mean        | Error        | StdDev     |
+|----------------- |------------:|-------------:|-----------:|
+| Set              |   995.48 us |    79.812 us |  12.351 us |
+| SetBuffered      |   997.53 us |    96.147 us |  14.879 us |
+| SetAsync         | 1,418.13 us | 1,863.325 us | 483.900 us |
+| SetBufferedAsync | 1,057.88 us |    74.595 us |  19.372 us |
+| Get              |   142.43 us |     3.455 us |   0.897 us |
+| GetBuffered      |    33.29 us |     5.368 us |   1.394 us |
+| GetAsync         |   216.54 us |    34.683 us |   9.007 us |
+| GetBufferedAsync |   206.95 us |     8.726 us |   1.350 us |
 
 > [!Note]
 > This cache is designed for single-process use.
