@@ -1,6 +1,6 @@
 ﻿namespace Eryri.Extensions.Caching.FileSystem.Models;
 
-internal record struct PriorityDateTimeOffset(DateTimeOffset Value) : IComparable<PriorityDateTimeOffset>
+internal record struct PriorityDateTimeOffset(long Value) : IComparable<PriorityDateTimeOffset>
 {
     private static ulong CurrentSequence = 0;
     public ulong Sequence { get; } = Interlocked.Increment(ref CurrentSequence);

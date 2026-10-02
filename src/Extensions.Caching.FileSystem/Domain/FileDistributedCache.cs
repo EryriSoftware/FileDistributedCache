@@ -32,7 +32,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     private readonly TimeProvider timeProvider;
     private readonly DirectoryInfo cacheDirectory;
     private readonly FileCacheMetadata metadata;
-    private DateTimeOffset nextCleanup = DateTimeOffset.MaxValue;
+    private long nextCleanup = DateTimeOffset.MaxValue.UtcTicks;
     private readonly ITimer cleanupTimer;
 
     public long Size => metadata.Size;
@@ -202,23 +202,23 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         while (metadata.TryGetValue(key, out var entry))
         {
-            var now = timeProvider.GetUtcNow();
+            var now = timeProvider.GetUtcNow().UtcTicks;
             var newEntry = entry with
             {
-                LastAccessUtc = now,
+                LastAccessTicks = now,
                 AccessCount = isAccessed ? entry.AccessCount + 1 : entry.AccessCount
             };
 
             if (metadata.TryUpdate(key, newEntry, entry))
             {
-                QueueCleanup(newEntry.Expiration);
+                QueueCleanup(newEntry.ExpirationTicks);
                 return;
             }
         }
     }
 
     private bool RemoveIfExpired(FileCacheEntry entry) =>
-        entry.Expiration is { } expiry && expiry < timeProvider.GetUtcNow() && Remove(entry);
+        entry.ExpirationTicks is { } expiry && expiry < timeProvider.GetUtcNow().UtcTicks && Remove(entry);
 
     public Task RefreshAsync(string key, CancellationToken cancellationToken)
     {
@@ -266,7 +266,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     private FileCacheEntry CreateFileEntry(string key, long payloadSize, DistributedCacheEntryOptions options)
     {
         var id = Guid.NewGuid().ToString("N");
-        var now = timeProvider.GetUtcNow();
+        var now = timeProvider.GetUtcNow().UtcTicks;
         var shard = id[..ShardingDepth];
         var path = Path.Combine(cacheDirectory.FullName, shard, $"{id}.bytes");
         directories.GetOrAdd(shard, static (shard, root) => Directory.CreateDirectory(Path.Combine(root.FullName, shard)), cacheDirectory);
@@ -274,15 +274,15 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             Key: key,
             Path: path,
             SizeBytes: payloadSize,
-            CreatedUtc: now,
-            LastAccessUtc: now)
+            CreatedTicks: now,
+            LastAccessTicks: now)
         {
-            AbsoluteExpiration = options.AbsoluteExpiration.HasValue
-                ? options.AbsoluteExpiration
+            AbsoluteExpirationTicks = options.AbsoluteExpiration.HasValue
+                ? options.AbsoluteExpiration.Value.UtcTicks
                 : options.AbsoluteExpirationRelativeToNow.HasValue
-                ? now.Add(options.AbsoluteExpirationRelativeToNow.Value)
+                ? now + options.AbsoluteExpirationRelativeToNow.Value.Ticks
                 : null,
-            SlidingExpiration = options.SlidingExpiration ?? settings.DefaultSlidingExpiration
+            SlidingExpirationTicks = options.SlidingExpiration?.Ticks ?? settings.DefaultSlidingExpiration?.Ticks
         };
     }
 
@@ -294,25 +294,25 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                 && metadata.TryUpdate(entry.Key, entry, existing))
             {
                 TryDelete(existing.Path);
-                QueueCleanup(entry.Expiration);
+                QueueCleanup(entry.ExpirationTicks);
                 return;
             }
             else if (metadata.TryAdd(entry.Key, entry))
             {
-                QueueCleanup(entry.Expiration);
+                QueueCleanup(entry.ExpirationTicks);
                 return;
             }
         }
     }
 
-    private void QueueCleanup(DateTimeOffset? dueTime)
+    private void QueueCleanup(long? dueTimeTicks)
     {
-        if (dueTime.HasValue && dueTime <= nextCleanup)
+        if (dueTimeTicks.HasValue && dueTimeTicks <= nextCleanup)
         {
-            var now = timeProvider.GetUtcNow();
-            nextCleanup = dueTime.Value;
-            var seconds = Math.Max(settings.ExpirationScanFrequency.TotalSeconds, (dueTime.Value - now).TotalSeconds);
-            cleanupTimer.Change(TimeSpan.FromSeconds(seconds), Timeout.InfiniteTimeSpan);
+            var now = timeProvider.GetUtcNow().UtcTicks;
+            nextCleanup = dueTimeTicks.Value;
+            var seconds = Math.Max(settings.ExpirationScanFrequency.Ticks, dueTimeTicks.Value - now);
+            cleanupTimer.Change(TimeSpan.FromTicks(seconds), Timeout.InfiniteTimeSpan);
         }
     }
 
@@ -329,12 +329,12 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     private long RemoveExpired()
     {
-        nextCleanup = DateTimeOffset.MaxValue;
+        nextCleanup = DateTimeOffset.MaxValue.UtcTicks;
         long removedBytes = 0;
-        var now = timeProvider.GetUtcNow();
+        var now = timeProvider.GetUtcNow().UtcTicks;
         while (metadata.TryDequeueTTL(out var item))
         {
-            if (item.Expiration <= now)
+            if (item.ExpirationTicks <= now)
             {
                 Remove(item);
                 removedBytes += item.SizeBytes;
@@ -342,7 +342,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             else
             {
                 metadata.EnqueueTtl(item);
-                QueueCleanup(item.Expiration);
+                QueueCleanup(item.ExpirationTicks);
                 break;
             }
         }

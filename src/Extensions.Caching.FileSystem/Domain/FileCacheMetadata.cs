@@ -78,9 +78,9 @@ internal class FileCacheMetadata(EvictionPolicy policy)
     private void Enqueue(FileCacheEntry value, FileCacheEntry? comparisonValue = null)
     {
         var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
-        if (value.Expiration.HasValue && value.Expiration != comparisonValue?.Expiration)
+        if (value.ExpirationTicks.HasValue && value.ExpirationTicks != comparisonValue?.ExpirationTicks)
         {
-            ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.Expiration.Value));
+            ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.ExpirationTicks.Value));
         }
 
         switch (policy)
@@ -88,7 +88,7 @@ internal class FileCacheMetadata(EvictionPolicy policy)
             case EvictionPolicy.TTL:
                 break; // TTL queue is always tracked
             case EvictionPolicy.LRU:
-                lruQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.LastAccessUtc));
+                lruQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.LastAccessTicks));
                 break;
             case EvictionPolicy.LFU:
                 if (value.AccessCount != comparisonValue?.AccessCount)
@@ -111,10 +111,10 @@ internal class FileCacheMetadata(EvictionPolicy policy)
 
     public void EnqueueTtl(FileCacheEntry value)
     {
-        if (value.Expiration.HasValue)
+        if (value.ExpirationTicks.HasValue)
         {
             var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
-            ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.Expiration.Value));
+            ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.ExpirationTicks.Value));
         }
     }
 
