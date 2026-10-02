@@ -39,10 +39,10 @@ public class BenchmarkTests
     [SimpleJob(
         warmupCount: 1,
         iterationCount: 5,
-        invocationCount: 300)]
+        invocationCount: 30)]
     public abstract class TestBase : IDisposable
     {
-        [Params(10)]
+        [Params(100)]
         public int ParallelOperations { get; set; }
         public const int NumberOfItemsUntilFull = SizeLimit / PayloadSize;
         public const int PayloadSize = 4 << 10; // 4 KiB

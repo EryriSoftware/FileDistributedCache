@@ -137,8 +137,8 @@ The benchmark that matters most for this package is **sustained operation with r
 
 - PayloadSize=4KiB
 - CacheSizeLimit=1MiB
-- ParallelOperations=10
-- InvocationCount=300
+- ParallelOperations=100
+- InvocationCount=30
 - IterationCount=5
 - UnrollFactor=1  
 - WarmupCount=1
@@ -147,31 +147,31 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 > 1s == 1000ms, 1ms == 1000us, 1us == 1000ns
 
 ### [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
-| Method           | Mean         | Error        | StdDev        |
-|----------------- |-------------:|-------------:|--------------:|
-| Set              | 3,306.095 us | 3,156.209 us |   488.4268 us |
-| SetBuffered      | 3,487.659 us | 3,621.124 us |   560.3729 us |
-| SetAsync         | 3,642.960 us | 1,129.727 us |   293.3865 us |
-| SetBufferedAsync | 4,437.605 us | 8,413.874 us | 1,302.0563 us |
-| Get              |   887.488 us |    59.669 us |    15.4957 us |
-| GetBuffered      |     9.441 us |     4.774 us |     0.7388 us |
-| GetAsync         |   933.900 us |    47.474 us |    12.3289 us |
-| GetBufferedAsync |   969.943 us |    35.844 us |     9.3086 us |
+| Method           | Mean      | Error     | StdDev    | Median    |
+|----------------- |----------:|----------:|----------:|----------:|
+| Set              | 31.763 ms | 25.644 ms |  3.968 ms | 33.555 ms |
+| SetBuffered      | 44.576 ms | 74.168 ms | 19.261 ms | 35.198 ms |
+| SetAsync         | 33.106 ms | 35.982 ms |  5.568 ms | 35.104 ms |
+| SetBufferedAsync | 30.608 ms | 15.294 ms |  3.971 ms | 30.953 ms |
+| Get              |  6.046 ms |  1.094 ms |  0.284 ms |  6.110 ms |
+| GetBuffered      |  0.067 ms |  0.022 ms |  0.003 ms |  0.067 ms |
+| GetAsync         |  6.421 ms |  0.359 ms |  0.055 ms |  6.435 ms |
+| GetBufferedAsync |  7.362 ms |  2.345 ms |  0.609 ms |  7.061 ms |
 
 > [!Note]
 > This cache is ephemeral, designed for single-process use.
 
 ### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
-| Method           | Mean       | Error        | StdDev      |
-|----------------- |-----------:|-------------:|------------:|
-| Set              | 8,748.5 us | 13,337.34 us | 3,463.66 us |
-| SetBuffered      | 7,788.6 us |  9,761.01 us | 2,534.90 us |
-| SetAsync         | 8,967.2 us | 12,605.49 us | 3,273.61 us |
-| SetBufferedAsync | 5,590.6 us |  5,241.74 us |   811.17 us |
-| Get              | 2,050.3 us |    100.42 us |    26.08 us |
-| GetBuffered      |   137.2 us |     17.00 us |     2.63 us |
-| GetAsync         | 2,054.4 us |    159.15 us |    24.63 us |
-| GetBufferedAsync | 2,044.2 us |    163.07 us |    42.35 us |
+| Method           | Mean      | Error       | StdDev     | Median    |
+|----------------- |----------:|------------:|-----------:|----------:|
+| Set              | 68.738 ms | 142.9623 ms | 22.1236 ms | 65.681 ms |
+| SetBuffered      | 69.703 ms |  90.9287 ms | 23.6139 ms | 65.810 ms |
+| SetAsync         | 76.828 ms | 117.5669 ms | 30.5318 ms | 59.628 ms |
+| SetBufferedAsync | 56.322 ms |  54.4735 ms |  8.4298 ms | 53.331 ms |
+| Get              | 13.735 ms |   4.4539 ms |  0.6892 ms | 13.693 ms |
+| GetBuffered      |  1.028 ms |   0.1026 ms |  0.0266 ms |  1.033 ms |
+| GetAsync         | 17.698 ms |   1.2860 ms |  0.3340 ms | 17.499 ms |
+| GetBufferedAsync | 17.886 ms |   2.2197 ms |  0.3435 ms | 17.830 ms |
 
 > [!Note]
 > This cache is designed for single-process use.
@@ -184,4 +184,4 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 > [!Warning]
 > - Retains the entire cache in-memory. The filesystem is used as persistance/distribution mechanism.
 > - Doesn't support SlidingExpiration.
-> - Doesn't implement IBufferDistributedCache.
+> - Doesn't implement `IBufferDistributedCache`.
