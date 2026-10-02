@@ -75,10 +75,10 @@ internal class FileCacheMetadata(EvictionPolicy policy)
         return false;
     }
 
-    private void Enqueue(FileCacheEntry value)
+    private void Enqueue(FileCacheEntry value, FileCacheEntry? comparisonValue = null)
     {
         var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
-        if (value.Expiration.HasValue)
+        if (value.Expiration.HasValue && value.Expiration != comparisonValue?.Expiration)
         {
             ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.Expiration.Value));
         }
@@ -91,10 +91,18 @@ internal class FileCacheMetadata(EvictionPolicy policy)
                 lruQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.LastAccessUtc));
                 break;
             case EvictionPolicy.LFU:
-                lfuQueue.Enqueue(candidate, value.AccessCount);
+                if (value.AccessCount != comparisonValue?.AccessCount)
+                {
+                    lfuQueue.Enqueue(candidate, value.AccessCount);
+                }
+
                 break;
             case EvictionPolicy.FIFO:
-                fifoQueue.Enqueue(candidate);
+                if (comparisonValue == null)
+                {
+                    fifoQueue.Enqueue(candidate);
+                }
+
                 break;
             default:
                 throw new NotImplementedException(policy.ToString());
