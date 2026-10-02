@@ -202,10 +202,9 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         while (metadata.TryGetValue(key, out var entry))
         {
-            var now = timeProvider.GetUtcNow().UtcTicks;
             var newEntry = entry with
             {
-                LastAccessTicks = now,
+                LastAccessTicks = timeProvider.GetUtcNow().UtcTicks,
                 AccessCount = isAccessed ? entry.AccessCount + 1 : entry.AccessCount
             };
 
@@ -281,6 +280,8 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                 ? options.AbsoluteExpiration.Value.UtcTicks
                 : options.AbsoluteExpirationRelativeToNow.HasValue
                 ? now + options.AbsoluteExpirationRelativeToNow.Value.Ticks
+                : settings.DefaultAbsoluteExpirationRelativeToNow.HasValue
+                ? now + settings.DefaultAbsoluteExpirationRelativeToNow.Value.Ticks
                 : null,
             SlidingExpirationTicks = options.SlidingExpiration?.Ticks ?? settings.DefaultSlidingExpiration?.Ticks
         };
