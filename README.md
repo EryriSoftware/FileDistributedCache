@@ -147,34 +147,41 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 > 1s == 1000ms, 1ms == 1000us, 1us == 1000ns
 
 ### [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
-| Method           | Mean         | Error         | StdDev        |
-|----------------- |-------------:|--------------:|--------------:|
-| Set              | 4,552.641 us |  6,579.117 us | 1,708.5759 us |
-| SetBuffered      | 4,615.141 us |  7,180.135 us | 1,111.1338 us |
-| SetAsync         | 7,574.364 us | 11,800.638 us | 3,064.5883 us |
-| SetBufferedAsync | 6,657.312 us | 11,809.849 us | 3,066.9802 us |
-| Get              |   892.934 us |    101.121 us |    26.2607 us |
-| GetBuffered      |     9.237 us |      5.037 us |     0.7795 us |
-| GetAsync         |   935.149 us |     93.342 us |    24.2407 us |
-| GetBufferedAsync |   971.196 us |    112.464 us |    29.2065 us |
+| Method           | Mean         | Error        | StdDev        |
+|----------------- |-------------:|-------------:|--------------:|
+| Set              | 3,306.095 us | 3,156.209 us |   488.4268 us |
+| SetBuffered      | 3,487.659 us | 3,621.124 us |   560.3729 us |
+| SetAsync         | 3,642.960 us | 1,129.727 us |   293.3865 us |
+| SetBufferedAsync | 4,437.605 us | 8,413.874 us | 1,302.0563 us |
+| Get              |   887.488 us |    59.669 us |    15.4957 us |
+| GetBuffered      |     9.441 us |     4.774 us |     0.7388 us |
+| GetAsync         |   933.900 us |    47.474 us |    12.3289 us |
+| GetBufferedAsync |   969.943 us |    35.844 us |     9.3086 us |
 
 > [!Note]
 > This cache is ephemeral, designed for single-process use.
 
 ### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
-| Method           | Mean        | Error        | StdDev      | Median      |
-|----------------- |------------:|-------------:|------------:|------------:|
-| Set              |  7,069.9 us |  6,738.93 us | 1,750.08 us |  7,400.0 us |
-| SetBuffered      |  7,136.6 us |  9,953.51 us | 1,540.32 us |  7,346.5 us |
-| SetAsync         |  8,499.3 us | 14,180.09 us | 3,682.53 us |  6,720.6 us |
-| SetBufferedAsync | 14,753.1 us | 28,344.16 us | 7,360.89 us | 18,163.5 us |
-| Get              |  2,161.5 us |    253.39 us |    65.81 us |  2,184.4 us |
-| GetBuffered      |    140.3 us |     15.33 us |     3.98 us |    139.4 us |
-| GetAsync         |  2,113.8 us |    236.79 us |    61.49 us |  2,090.6 us |
-| GetBufferedAsync |  2,174.6 us |    659.35 us |   102.04 us |  2,140.6 us |
+| Method           | Mean       | Error        | StdDev      |
+|----------------- |-----------:|-------------:|------------:|
+| Set              | 8,748.5 us | 13,337.34 us | 3,463.66 us |
+| SetBuffered      | 7,788.6 us |  9,761.01 us | 2,534.90 us |
+| SetAsync         | 8,967.2 us | 12,605.49 us | 3,273.61 us |
+| SetBufferedAsync | 5,590.6 us |  5,241.74 us |   811.17 us |
+| Get              | 2,050.3 us |    100.42 us |    26.08 us |
+| GetBuffered      |   137.2 us |     17.00 us |     2.63 us |
+| GetAsync         | 2,054.4 us |    159.15 us |    24.63 us |
+| GetBufferedAsync | 2,044.2 us |    163.07 us |    42.35 us |
 
 > [!Note]
 > This cache is designed for single-process use.
 
 > [!Warning]
 > Size limits are eventual, not strict. Write methods publishes without checking MaxTotalSize or MaxEntries; eviction only acts on its periodic scan.
+
+### [Net.DistributedFileStoreCache](https://www.nuget.org/packages/Net.DistributedFileStoreCache)
+
+> [!Warning]
+> - Retains the entire cache in-memory. The filesystem is used as persistance/distribution mechanism.
+> - Doesn't support SlidingExpiration.
+> - Doesn't implement IBufferDistributedCache.
