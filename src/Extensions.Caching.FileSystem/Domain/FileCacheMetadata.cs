@@ -11,7 +11,7 @@ internal class FileCacheMetadata(EvictionPolicy policy)
     private readonly ConcurrentDictionary<string, FileCacheEntry> files = new (StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentPriorityQueue<PriorityCandidate, SequencedValue<long>> lruQueue = new ();
     private readonly ConcurrentPriorityQueue<PriorityCandidate, ulong> lfuQueue = new ();
-    private readonly ConcurrentPriorityQueue<PriorityCandidate, SequencedValue<long>> ttlQueue = new ();
+    private readonly ConcurrentPriorityQueue<PriorityCandidate, long> ttlQueue = new ();
     private readonly ConcurrentQueue<PriorityCandidate> fifoQueue = new ();
 
     public void Clear()
@@ -78,9 +78,9 @@ internal class FileCacheMetadata(EvictionPolicy policy)
     private void Enqueue(FileCacheEntry value, FileCacheEntry? comparisonValue)
     {
         var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
-        if (value.ExpirationTicks.HasValue && value.ExpirationTicks != comparisonValue?.ExpirationTicks)
+        if (value.ExpirationTicks.HasValue)
         {
-            ttlQueue.Enqueue(candidate, new SequencedValue<long>(value.ExpirationTicks.Value));
+            ttlQueue.Enqueue(candidate, value.ExpirationTicks.Value);
         }
 
         switch (policy)
@@ -114,7 +114,7 @@ internal class FileCacheMetadata(EvictionPolicy policy)
         if (value.ExpirationTicks.HasValue)
         {
             var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
-            ttlQueue.Enqueue(candidate, new SequencedValue<long>(value.ExpirationTicks.Value));
+            ttlQueue.Enqueue(candidate, value.ExpirationTicks.Value);
         }
     }
 
