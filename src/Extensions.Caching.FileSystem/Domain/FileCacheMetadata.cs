@@ -7,12 +7,11 @@ namespace Eryri.Extensions.Caching.FileSystem.Domain;
 internal class FileCacheMetadata(EvictionPolicy policy)
 {
     private long _size;
-    public long Size => Interlocked.Read(ref _size);
-    private object queueLock = new ();
+    public long Size => Volatile.Read(ref _size);
     private readonly ConcurrentDictionary<string, FileCacheEntry> files = new (StringComparer.OrdinalIgnoreCase);
-    private readonly PriorityQueue<PriorityCandidate, PriorityDateTimeOffset> lruQueue = new ();
-    private readonly PriorityQueue<PriorityCandidate, int> lfuQueue = new ();
-    private readonly PriorityQueue<PriorityCandidate, PriorityDateTimeOffset> ttlQueue = new ();
+    private readonly ConcurrentPriorityQueue<PriorityCandidate, PriorityDateTimeOffset> lruQueue = new ();
+    private readonly ConcurrentPriorityQueue<PriorityCandidate, ulong> lfuQueue = new ();
+    private readonly ConcurrentPriorityQueue<PriorityCandidate, PriorityDateTimeOffset> ttlQueue = new ();
     private readonly ConcurrentQueue<PriorityCandidate> fifoQueue = new ();
 
     public void Clear()
@@ -79,29 +78,26 @@ internal class FileCacheMetadata(EvictionPolicy policy)
     private void Enqueue(FileCacheEntry value)
     {
         var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
-        lock (queueLock)
+        if (value.Expiration.HasValue)
         {
-            if (value.Expiration.HasValue)
-            {
-                ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.Expiration.Value));
-            }
+            ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.Expiration.Value));
+        }
 
-            switch (policy)
-            {
-                case EvictionPolicy.TTL:
-                    break; // TTL queue is always tracked
-                case EvictionPolicy.LRU:
-                    lruQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.LastAccessUtc));
-                    break;
-                case EvictionPolicy.LFU:
-                    lfuQueue.Enqueue(candidate, value.AccessCount);
-                    break;
-                case EvictionPolicy.FIFO:
-                    fifoQueue.Enqueue(candidate);
-                    break;
-                default:
-                    throw new NotImplementedException(policy.ToString());
-            }
+        switch (policy)
+        {
+            case EvictionPolicy.TTL:
+                break; // TTL queue is always tracked
+            case EvictionPolicy.LRU:
+                lruQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.LastAccessUtc));
+                break;
+            case EvictionPolicy.LFU:
+                lfuQueue.Enqueue(candidate, value.AccessCount);
+                break;
+            case EvictionPolicy.FIFO:
+                fifoQueue.Enqueue(candidate);
+                break;
+            default:
+                throw new NotImplementedException(policy.ToString());
         }
     }
 
@@ -110,27 +106,19 @@ internal class FileCacheMetadata(EvictionPolicy policy)
         if (value.Expiration.HasValue)
         {
             var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
-            lock (queueLock)
-            {
-                ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.Expiration.Value));
-            }
+            ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.Expiration.Value));
         }
     }
 
-    private bool TryDequeueCandidate(EvictionPolicy policy, out PriorityCandidate candidate)
-    {
-        lock (queueLock)
+    private bool TryDequeueCandidate(EvictionPolicy policy, out PriorityCandidate candidate) =>
+        policy switch
         {
-            return policy switch
-            {
-                EvictionPolicy.TTL => ttlQueue.TryDequeue(out candidate, out _),
-                EvictionPolicy.LRU => lruQueue.TryDequeue(out candidate, out _),
-                EvictionPolicy.LFU => lfuQueue.TryDequeue(out candidate, out _),
-                EvictionPolicy.FIFO => fifoQueue.TryDequeue(out candidate),
-                _ => throw new NotImplementedException(policy.ToString())
-            };
-        }
-    }
+            EvictionPolicy.TTL => ttlQueue.TryDequeue(out candidate),
+            EvictionPolicy.LRU => lruQueue.TryDequeue(out candidate),
+            EvictionPolicy.LFU => lfuQueue.TryDequeue(out candidate),
+            EvictionPolicy.FIFO => fifoQueue.TryDequeue(out candidate),
+            _ => throw new NotImplementedException(policy.ToString())
+        };
 
     private bool TryDequeue(EvictionPolicy policy, [NotNullWhen(true)] out FileCacheEntry? value)
     {

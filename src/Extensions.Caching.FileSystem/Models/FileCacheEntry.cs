@@ -7,8 +7,8 @@ internal sealed record FileCacheEntry(
     DateTimeOffset CreatedUtc,
     DateTimeOffset LastAccessUtc)
 {
-    public int Version { get; init; } = 0;
-    public int AccessCount { get; init; } = 0;
+    public ulong Version { get; init; } = 0;
+    public ulong AccessCount { get; init; } = 0;
     public DateTimeOffset? AbsoluteExpiration { get; init; }
     public TimeSpan? SlidingExpiration { get; init; }
     public DateTimeOffset? Expiration

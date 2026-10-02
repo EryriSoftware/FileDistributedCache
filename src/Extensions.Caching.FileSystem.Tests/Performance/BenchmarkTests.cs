@@ -39,11 +39,13 @@ public class BenchmarkTests
     [SimpleJob(
         warmupCount: 1,
         iterationCount: 5,
-        invocationCount: NumberOfItemsUntilFull)]
+        invocationCount: 300)]
     public abstract class TestBase : IDisposable
     {
+        [Params(10)]
+        public int ParallelOperations { get; set; }
         public const int NumberOfItemsUntilFull = SizeLimit / PayloadSize;
-        public const int PayloadSize = 1 << 10; // 1 KiB
+        public const int PayloadSize = 4 << 10; // 4 KiB
         public const int SizeLimit = 1 << 20; // 1 MiB
         protected readonly DirectoryInfo cacheDirectory = Directory.CreateTempSubdirectory();
         private string key = Guid.NewGuid().ToString("N");
@@ -66,6 +68,12 @@ public class BenchmarkTests
             disposable = sp;
             cache = sp.GetRequiredService<IDistributedCache>();
             bufferedCache = sp.GetService<IBufferDistributedCache>();
+
+            Parallel.For(0, NumberOfItemsUntilFull, i =>
+            {
+                var key = Guid.NewGuid().ToString("N");
+                cache.Set(key, payload, cacheEntryOptions);
+            });
         }
 
         [GlobalCleanup]
@@ -87,71 +95,91 @@ public class BenchmarkTests
         [Benchmark]
         public void Set()
         {
-            var key = Guid.NewGuid().ToString("N");
-            cache!.Set(key, payload, cacheEntryOptions);
-            this.key = key;
+            Parallel.For(0, ParallelOperations, i =>
+            {
+                var key = Guid.NewGuid().ToString("N");
+                cache!.Set(key, payload, cacheEntryOptions);
+            });
         }
 
         [Benchmark]
         public void SetBuffered()
         {
-            var key = Guid.NewGuid().ToString("N");
-            bufferedCache!.Set(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
-            this.key = key;
+            Parallel.For(0, ParallelOperations, i =>
+            {
+                var key = Guid.NewGuid().ToString("N");
+                bufferedCache!.Set(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
+            });
         }
 
         [Benchmark]
         public async Task SetAsync()
         {
-            var key = Guid.NewGuid().ToString("N");
-            await cache!.SetAsync(key, payload, cacheEntryOptions);
-            this.key = key;
+            await Parallel.ForAsync(0, ParallelOperations, async (i, _) =>
+            {
+                var key = Guid.NewGuid().ToString("N");
+                await cache!.SetAsync(key, payload, cacheEntryOptions);
+            });
         }
 
         [Benchmark]
         public async Task SetBufferedAsync()
         {
-            var key = Guid.NewGuid().ToString("N");
-            await bufferedCache!.SetAsync(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
-            this.key = key;
+            await Parallel.ForAsync(0, ParallelOperations, async (i, _) =>
+            {
+                var key = Guid.NewGuid().ToString("N");
+                await bufferedCache!.SetAsync(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
+            });
         }
 
         [Benchmark]
         public void Get()
         {
-            if (cache!.Get(key) == null)
+            Parallel.For(0, ParallelOperations, i =>
             {
-                cache!.Set(key, payload, cacheEntryOptions);
-            }
+                if (cache!.Get(key) == null)
+                {
+                    cache!.Set(key, payload, cacheEntryOptions);
+                }
+            });
         }
 
         [Benchmark]
         public void GetBuffered()
         {
-            var buffer = new ArrayBufferWriter<byte>(payload.Length);
-            if (bufferedCache!.TryGet(key, buffer))
+            Parallel.For(0, ParallelOperations, i =>
             {
-                bufferedCache!.Set(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
-            }
+                var buffer = new ArrayBufferWriter<byte>(payload.Length);
+                if (bufferedCache!.TryGet(key, buffer))
+                {
+                    bufferedCache!.Set(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
+                }
+            });
         }
 
         [Benchmark]
         public async Task GetAsync()
         {
-            if (await cache!.GetAsync(key) == null)
+            await Parallel.ForAsync(0, ParallelOperations, async (i, _) =>
             {
-                await cache!.SetAsync(key, payload, cacheEntryOptions);
-            }
+                if (await cache!.GetAsync(key) == null)
+                {
+                    await cache!.SetAsync(key, payload, cacheEntryOptions);
+                }
+            });
         }
 
         [Benchmark]
         public async Task GetBufferedAsync()
         {
-            var buffer = new ArrayBufferWriter<byte>(payload.Length);
-            if (!await bufferedCache!.TryGetAsync(key, buffer))
+            await Parallel.ForAsync(0, ParallelOperations, async (i, _) =>
             {
-                await bufferedCache!.SetAsync(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
-            }
+                var buffer = new ArrayBufferWriter<byte>(payload.Length);
+                if (!await bufferedCache!.TryGetAsync(key, buffer))
+                {
+                    await bufferedCache!.SetAsync(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
+                }
+            });
         }
     }
 }
