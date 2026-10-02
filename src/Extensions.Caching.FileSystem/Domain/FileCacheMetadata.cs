@@ -33,7 +33,7 @@ internal class FileCacheMetadata(EvictionPolicy policy)
         };
         if (files.TryUpdate(key, newValue, comparisonValue))
         {
-            Enqueue(newValue);
+            Enqueue(newValue, comparisonValue);
             Interlocked.Add(ref _size, newValue.SizeBytes - comparisonValue.SizeBytes);
             return true;
         }
@@ -67,7 +67,7 @@ internal class FileCacheMetadata(EvictionPolicy policy)
     {
         if (files.TryAdd(key, value))
         {
-            Enqueue(value);
+            Enqueue(value, null);
             Interlocked.Add(ref _size, value.SizeBytes);
             return true;
         }
@@ -75,7 +75,7 @@ internal class FileCacheMetadata(EvictionPolicy policy)
         return false;
     }
 
-    private void Enqueue(FileCacheEntry value, FileCacheEntry? comparisonValue = null)
+    private void Enqueue(FileCacheEntry value, FileCacheEntry? comparisonValue)
     {
         var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
         if (value.ExpirationTicks.HasValue && value.ExpirationTicks != comparisonValue?.ExpirationTicks)
