@@ -1,12 +1,12 @@
 ﻿namespace Eryri.Extensions.Caching.FileSystem.Models;
 
-internal record struct PriorityDateTimeOffset(long Value) : IComparable<PriorityDateTimeOffset>
+internal record struct SequencedValue<T>(T Value) : IComparable<SequencedValue<T>>
 {
     private static ulong CurrentSequence = 0;
     public ulong Sequence { get; } = Interlocked.Increment(ref CurrentSequence);
-    public int CompareTo(PriorityDateTimeOffset other)
+    public int CompareTo(SequencedValue<T> other)
     {
-        var timeComparison = Value.CompareTo(other.Value);
+        var timeComparison = Comparer<T>.Default.Compare(Value, other.Value);
 
         return timeComparison != 0
             ? timeComparison

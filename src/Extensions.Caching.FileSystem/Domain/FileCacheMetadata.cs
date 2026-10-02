@@ -9,9 +9,9 @@ internal class FileCacheMetadata(EvictionPolicy policy)
     private long _size;
     public long Size => Volatile.Read(ref _size);
     private readonly ConcurrentDictionary<string, FileCacheEntry> files = new (StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentPriorityQueue<PriorityCandidate, PriorityDateTimeOffset> lruQueue = new ();
+    private readonly ConcurrentPriorityQueue<PriorityCandidate, SequencedValue<long>> lruQueue = new ();
     private readonly ConcurrentPriorityQueue<PriorityCandidate, ulong> lfuQueue = new ();
-    private readonly ConcurrentPriorityQueue<PriorityCandidate, PriorityDateTimeOffset> ttlQueue = new ();
+    private readonly ConcurrentPriorityQueue<PriorityCandidate, SequencedValue<long>> ttlQueue = new ();
     private readonly ConcurrentQueue<PriorityCandidate> fifoQueue = new ();
 
     public void Clear()
@@ -80,7 +80,7 @@ internal class FileCacheMetadata(EvictionPolicy policy)
         var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
         if (value.ExpirationTicks.HasValue && value.ExpirationTicks != comparisonValue?.ExpirationTicks)
         {
-            ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.ExpirationTicks.Value));
+            ttlQueue.Enqueue(candidate, new SequencedValue<long>(value.ExpirationTicks.Value));
         }
 
         switch (policy)
@@ -88,7 +88,7 @@ internal class FileCacheMetadata(EvictionPolicy policy)
             case EvictionPolicy.TTL:
                 break; // TTL queue is always tracked
             case EvictionPolicy.LRU:
-                lruQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.LastAccessTicks));
+                lruQueue.Enqueue(candidate, new SequencedValue<long>(value.LastAccessTicks));
                 break;
             case EvictionPolicy.LFU:
                 if (value.AccessCount != comparisonValue?.AccessCount)
@@ -114,7 +114,7 @@ internal class FileCacheMetadata(EvictionPolicy policy)
         if (value.ExpirationTicks.HasValue)
         {
             var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
-            ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.ExpirationTicks.Value));
+            ttlQueue.Enqueue(candidate, new SequencedValue<long>(value.ExpirationTicks.Value));
         }
     }
 
