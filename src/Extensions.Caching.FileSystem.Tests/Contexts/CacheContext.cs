@@ -10,6 +10,7 @@ internal class CacheContext : IDisposable
     public DateTimeOffset Now => TimeProvider.GetUtcNow();
     public FakeTimeProvider TimeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
     public IDistributedCache Cache => field ??= Services.GetRequiredService<IDistributedCache>();
+    public IBufferDistributedCache BufferCache => field ??= Services.GetRequiredService<IBufferDistributedCache>();
     public IFileDistributedCache FileCache => field ??= Services.GetRequiredService<IFileDistributedCache>();
 
     public CacheContext(EvictionPolicy evictionPolicy = EvictionPolicy.LRU, int? sizeLimitBytes = null) =>

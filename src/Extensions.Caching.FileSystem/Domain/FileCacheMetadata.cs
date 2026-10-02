@@ -7,12 +7,11 @@ namespace Eryri.Extensions.Caching.FileSystem.Domain;
 internal class FileCacheMetadata(EvictionPolicy policy)
 {
     private long _size;
-    public long Size => Interlocked.Read(ref _size);
-    private object queueLock = new ();
+    public long Size => Volatile.Read(ref _size);
     private readonly ConcurrentDictionary<string, FileCacheEntry> files = new (StringComparer.OrdinalIgnoreCase);
-    private readonly PriorityQueue<PriorityCandidate, PriorityDateTimeOffset> lruQueue = new ();
-    private readonly PriorityQueue<PriorityCandidate, int> lfuQueue = new ();
-    private readonly PriorityQueue<PriorityCandidate, PriorityDateTimeOffset> ttlQueue = new ();
+    private readonly ConcurrentPriorityQueue<PriorityCandidate, SequencedValue<long>> lruQueue = new ();
+    private readonly ConcurrentPriorityQueue<PriorityCandidate, ulong> lfuQueue = new ();
+    private readonly ConcurrentPriorityQueue<PriorityCandidate, long> ttlQueue = new ();
     private readonly ConcurrentQueue<PriorityCandidate> fifoQueue = new ();
 
     public void Clear()
@@ -34,7 +33,7 @@ internal class FileCacheMetadata(EvictionPolicy policy)
         };
         if (files.TryUpdate(key, newValue, comparisonValue))
         {
-            Enqueue(newValue);
+            Enqueue(newValue, comparisonValue);
             Interlocked.Add(ref _size, newValue.SizeBytes - comparisonValue.SizeBytes);
             return true;
         }
@@ -68,7 +67,7 @@ internal class FileCacheMetadata(EvictionPolicy policy)
     {
         if (files.TryAdd(key, value))
         {
-            Enqueue(value);
+            Enqueue(value, null);
             Interlocked.Add(ref _size, value.SizeBytes);
             return true;
         }
@@ -76,54 +75,58 @@ internal class FileCacheMetadata(EvictionPolicy policy)
         return false;
     }
 
-    private void Enqueue(FileCacheEntry value)
+    private void Enqueue(FileCacheEntry value, FileCacheEntry? comparisonValue)
     {
         var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
-        lock (queueLock)
+        if (value.ExpirationTicks.HasValue)
         {
-            ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.Expiration ?? DateTimeOffset.MaxValue));
-            switch (policy)
-            {
-                case EvictionPolicy.TTL:
-                    break; // TTL queue is always tracked
-                case EvictionPolicy.LRU:
-                    lruQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.LastAccessUtc));
-                    break;
-                case EvictionPolicy.LFU:
+            ttlQueue.Enqueue(candidate, value.ExpirationTicks.Value);
+        }
+
+        switch (policy)
+        {
+            case EvictionPolicy.TTL:
+                break; // TTL queue is always tracked
+            case EvictionPolicy.LRU:
+                lruQueue.Enqueue(candidate, new SequencedValue<long>(value.LastAccessTicks));
+                break;
+            case EvictionPolicy.LFU:
+                if (value.AccessCount != comparisonValue?.AccessCount)
+                {
                     lfuQueue.Enqueue(candidate, value.AccessCount);
-                    break;
-                case EvictionPolicy.FIFO:
+                }
+
+                break;
+            case EvictionPolicy.FIFO:
+                if (comparisonValue == null)
+                {
                     fifoQueue.Enqueue(candidate);
-                    break;
-                default:
-                    throw new NotImplementedException($"Eviction policy {policy} is not implemented.");
-            }
+                }
+
+                break;
+            default:
+                throw new NotImplementedException(policy.ToString());
         }
     }
 
     public void EnqueueTtl(FileCacheEntry value)
     {
-        var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
-        lock (queueLock)
+        if (value.ExpirationTicks.HasValue)
         {
-            ttlQueue.Enqueue(candidate, new PriorityDateTimeOffset(value.Expiration ?? DateTimeOffset.MaxValue));
+            var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
+            ttlQueue.Enqueue(candidate, value.ExpirationTicks.Value);
         }
     }
 
-    private bool TryDequeueCandidate(EvictionPolicy policy, out PriorityCandidate candidate)
-    {
-        lock (queueLock)
+    private bool TryDequeueCandidate(EvictionPolicy policy, out PriorityCandidate candidate) =>
+        policy switch
         {
-            return policy switch
-            {
-                EvictionPolicy.TTL => ttlQueue.TryDequeue(out candidate, out _),
-                EvictionPolicy.LRU => lruQueue.TryDequeue(out candidate, out _),
-                EvictionPolicy.LFU => lfuQueue.TryDequeue(out candidate, out _),
-                EvictionPolicy.FIFO => fifoQueue.TryDequeue(out candidate),
-                _ => throw new ArgumentOutOfRangeException(nameof(policy))
-            };
-        }
-    }
+            EvictionPolicy.TTL => ttlQueue.TryDequeue(out candidate),
+            EvictionPolicy.LRU => lruQueue.TryDequeue(out candidate),
+            EvictionPolicy.LFU => lfuQueue.TryDequeue(out candidate),
+            EvictionPolicy.FIFO => fifoQueue.TryDequeue(out candidate),
+            _ => throw new NotImplementedException(policy.ToString())
+        };
 
     private bool TryDequeue(EvictionPolicy policy, [NotNullWhen(true)] out FileCacheEntry? value)
     {

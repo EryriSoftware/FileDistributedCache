@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using System.Buffers;
+using System.Security.Cryptography;
 using Eryri.Extensions.Caching.FileSystem.Tests.Contexts;
 using FluentAssertions;
 using Microsoft.Extensions.Caching.Distributed;
@@ -30,6 +31,52 @@ internal class ReadWriteTests
 
         // Assert
         actual.Should().BeEquivalentTo(payload);
+    }
+
+    [TestCase(1)]
+    [TestCase(1 << 10)] // 1 KiB
+    public void Can_Set_And_Get_Buffered(int payloadSize)
+    {
+        // Arrange
+        using var ctx = new CacheContext();
+        var payload = RandomNumberGenerator.GetBytes(payloadSize);
+        var options = new DistributedCacheEntryOptions
+        {
+            AbsoluteExpiration = ctx.Now.AddDays(1)
+        };
+        var buffer = new ArrayBufferWriter<byte>(payloadSize);
+
+        // Act
+        var key = Guid.NewGuid().ToString("N") + ForbiddenFilenameCharacters;
+        ctx.BufferCache.Set(key, new ReadOnlySequence<byte>(payload), options);
+        var canRead = ctx.BufferCache.TryGet(key, buffer);
+
+        // Assert
+        canRead.Should().BeTrue();
+        buffer.WrittenSpan.ToArray().Should().BeEquivalentTo(payload);
+    }
+
+    [TestCase(1)]
+    [TestCase(1 << 10)] // 1 KiB
+    public async Task Can_SetAsync_And_GetAsync_Buffered(int payloadSize)
+    {
+        // Arrange
+        using var ctx = new CacheContext();
+        var payload = RandomNumberGenerator.GetBytes(payloadSize);
+        var options = new DistributedCacheEntryOptions
+        {
+            AbsoluteExpiration = ctx.Now.AddDays(1)
+        };
+        var buffer = new ArrayBufferWriter<byte>(payloadSize);
+
+        // Act
+        var key = Guid.NewGuid().ToString("N") + ForbiddenFilenameCharacters;
+        await ctx.BufferCache.SetAsync(key, new ReadOnlySequence<byte>(payload), options, CancellationToken);
+        var canRead = await ctx.BufferCache.TryGetAsync(key, buffer, CancellationToken);
+
+        // Assert
+        canRead.Should().BeTrue();
+        buffer.WrittenSpan.ToArray().Should().BeEquivalentTo(payload);
     }
 
     [TestCase(1)]

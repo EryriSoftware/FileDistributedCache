@@ -1,7 +1,6 @@
 ﻿using System.Buffers;
+using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
-using System.Security.Cryptography;
-using System.Text;
 using Eryri.Extensions.Caching.FileSystem.Extensions;
 using Eryri.Extensions.Caching.FileSystem.Models;
 using Microsoft.Extensions.Caching.Distributed;
@@ -22,15 +21,18 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         this.logger = logger;
         cleanupTimer = timeProvider.CreateTimer(_ => RemoveExpired(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         metadata = new FileCacheMetadata(optionsAccessor.Value.EvictionPolicy);
+        cacheDirectory = Directory.CreateTempSubdirectory();
     }
 
+    private readonly ConcurrentDictionary<string, DirectoryInfo> directories = new (StringComparer.OrdinalIgnoreCase);
+    private const int ShardingDepth = 3;
     private bool isDisposed = false;
     private readonly ILogger? logger;
     private readonly FileCacheOptions settings;
     private readonly TimeProvider timeProvider;
-    private readonly DirectoryInfo cacheDirectory = Directory.CreateTempSubdirectory();
+    private readonly DirectoryInfo cacheDirectory;
     private readonly FileCacheMetadata metadata;
-    private DateTimeOffset nextCleanup = DateTimeOffset.MaxValue;
+    private long nextCleanup = DateTimeOffset.MaxValue.UtcTicks;
     private readonly ITimer cleanupTimer;
 
     public long Size => metadata.Size;
@@ -59,11 +61,23 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     public byte[]? Get(string key)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-
-        return TryGet(key, buffer)
-            ? buffer.WrittenMemory.ToArray()
-            : null;
+        if (metadata.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
+        {
+            UpdateEntry(key, true);
+            try
+            {
+                return File.ReadAllBytes(entry.Path);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogCritical(ex, "Failed to read cache file");
+                return null;
+            }
+        }
+        else
+        {
+            return null;
+        }
     }
 
     public async ValueTask<bool> TryGetAsync(string key, IBufferWriter<byte> destination, CancellationToken cancellationToken)
@@ -90,16 +104,28 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     public async Task<byte[]?> GetAsync(string key, CancellationToken cancellationToken)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-
-        return await TryGetAsync(key, buffer, cancellationToken)
-            ? buffer.WrittenMemory.ToArray()
-            : null;
+        if (metadata.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
+        {
+            UpdateEntry(key, true);
+            try
+            {
+                return await File.ReadAllBytesAsync(entry.Path, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogCritical(ex, "Failed to read cache file");
+                return null;
+            }
+        }
+        else
+        {
+            return null;
+        }
     }
 
     public void Set(string key, ReadOnlySequence<byte> value, DistributedCacheEntryOptions options)
     {
-        var entry = CreateFileEntry(key, value, options);
+        var entry = CreateFileEntry(key, value.Length, options);
         EnsureCapacityFor(entry.SizeBytes);
 
         try
@@ -114,11 +140,26 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         }
     }
 
-    public void Set(string key, byte[] value, DistributedCacheEntryOptions options) => Set(key, new ReadOnlySequence<byte>(value), options);
+    public void Set(string key, byte[] value, DistributedCacheEntryOptions options)
+    {
+        var entry = CreateFileEntry(key, value.Length, options);
+        EnsureCapacityFor(entry.SizeBytes);
+
+        try
+        {
+            File.WriteAllBytes(entry.Path, value);
+            PublishEntry(entry);
+        }
+        catch (Exception ex)
+        {
+            TryDelete(entry.Path);
+            logger?.LogCritical(ex, "Failed to write cache file");
+        }
+    }
 
     public async ValueTask SetAsync(string key, ReadOnlySequence<byte> value, DistributedCacheEntryOptions options, CancellationToken cancellationToken)
     {
-        var entry = CreateFileEntry(key, value, options);
+        var entry = CreateFileEntry(key, value.Length, options);
         EnsureCapacityFor(entry.SizeBytes);
 
         try
@@ -134,8 +175,23 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         }
     }
 
-    public async Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken cancellationToken) =>
-        await SetAsync(key, new ReadOnlySequence<byte>(value), options, cancellationToken);
+    public async Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken cancellationToken)
+    {
+        var entry = CreateFileEntry(key, value.Length, options);
+        EnsureCapacityFor(entry.SizeBytes);
+
+        try
+        {
+            await File.WriteAllBytesAsync(entry.Path, value, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            PublishEntry(entry);
+        }
+        catch (Exception ex)
+        {
+            TryDelete(entry.Path);
+            logger?.LogCritical(ex, "Failed to write cache file");
+        }
+    }
 
     public void Refresh(string key)
     {
@@ -146,24 +202,22 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         while (metadata.TryGetValue(key, out var entry))
         {
-            var now = timeProvider.GetUtcNow();
-            var newEntry = entry with { LastAccessUtc = now };
-
-            if (isAccessed)
+            var newEntry = entry with
             {
-                newEntry = newEntry with { AccessCount = newEntry.AccessCount + 1 };
-            }
+                LastAccessTicks = timeProvider.GetUtcNow().UtcTicks,
+                AccessCount = isAccessed ? entry.AccessCount + 1 : entry.AccessCount
+            };
 
             if (metadata.TryUpdate(key, newEntry, entry))
             {
-                QueueCleanup(newEntry.Expiration);
+                QueueCleanup(newEntry.ExpirationTicks);
                 return;
             }
         }
     }
 
     private bool RemoveIfExpired(FileCacheEntry entry) =>
-        entry.Expiration is { } expiry && expiry < timeProvider.GetUtcNow() && Remove(entry);
+        entry.ExpirationTicks is { } expiry && expiry < timeProvider.GetUtcNow().UtcTicks && Remove(entry);
 
     public Task RefreshAsync(string key, CancellationToken cancellationToken)
     {
@@ -208,24 +262,28 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         }
     }
 
-    private FileCacheEntry CreateFileEntry(string key, ReadOnlySequence<byte> value, DistributedCacheEntryOptions options)
+    private FileCacheEntry CreateFileEntry(string key, long payloadSize, DistributedCacheEntryOptions options)
     {
-        var now = timeProvider.GetUtcNow();
+        var id = Guid.NewGuid().ToString("N");
+        var now = timeProvider.GetUtcNow().UtcTicks;
+        var shard = id[..ShardingDepth];
+        var path = Path.Combine(cacheDirectory.FullName, shard, $"{id}.bytes");
+        directories.GetOrAdd(shard, static (shard, root) => Directory.CreateDirectory(Path.Combine(root.FullName, shard)), cacheDirectory);
         return new FileCacheEntry(
             Key: key,
-            Path: Path.Combine(cacheDirectory.FullName, GetFileName(key)),
-            SizeBytes: value.Length,
-            CreatedUtc: now,
-            LastAccessUtc: now)
+            Path: path,
+            SizeBytes: payloadSize,
+            CreatedTicks: now,
+            LastAccessTicks: now)
         {
-            AbsoluteExpiration = options.AbsoluteExpirationRelativeToNow.HasValue
-                ? now.Add(options.AbsoluteExpirationRelativeToNow.Value)
-                : options.AbsoluteExpiration.HasValue
-                ? options.AbsoluteExpiration
-                : settings.DefaultSlidingExpiration.HasValue
-                ? now.Add(settings.DefaultSlidingExpiration.Value)
+            AbsoluteExpirationTicks = options.AbsoluteExpiration.HasValue
+                ? options.AbsoluteExpiration.Value.UtcTicks
+                : options.AbsoluteExpirationRelativeToNow.HasValue
+                ? now + options.AbsoluteExpirationRelativeToNow.Value.Ticks
+                : settings.DefaultAbsoluteExpirationRelativeToNow.HasValue
+                ? now + settings.DefaultAbsoluteExpirationRelativeToNow.Value.Ticks
                 : null,
-            SlidingExpiration = options.SlidingExpiration ?? settings.DefaultSlidingExpiration
+            SlidingExpirationTicks = options.SlidingExpiration?.Ticks ?? settings.DefaultSlidingExpiration?.Ticks
         };
     }
 
@@ -237,44 +295,25 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                 && metadata.TryUpdate(entry.Key, entry, existing))
             {
                 TryDelete(existing.Path);
-                QueueCleanup(entry.Expiration);
+                QueueCleanup(entry.ExpirationTicks);
                 return;
             }
             else if (metadata.TryAdd(entry.Key, entry))
             {
-                QueueCleanup(entry.Expiration);
+                QueueCleanup(entry.ExpirationTicks);
                 return;
             }
         }
     }
 
-    private static string GetFileName(string key)
+    private void QueueCleanup(long? dueTimeTicks)
     {
-        var bufferLength = Encoding.UTF8.GetByteCount(key);
-        var buffer = ArrayPool<byte>.Shared.Rent(bufferLength);
-        var hash = ArrayPool<byte>.Shared.Rent(SHA256.HashSizeInBytes);
-
-        try
+        if (dueTimeTicks.HasValue && dueTimeTicks <= nextCleanup)
         {
-            Encoding.UTF8.GetBytes(key, buffer);
-            SHA256.HashData(buffer.AsSpan(0, bufferLength), hash);
-            return $"{Convert.ToHexStringLower(hash, 0, SHA256.HashSizeInBytes)}{Guid.NewGuid():N}.bytes";
-        }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(buffer);
-            ArrayPool<byte>.Shared.Return(hash);
-        }
-    }
-
-    private void QueueCleanup(DateTimeOffset? dueTime)
-    {
-        if (dueTime.HasValue && dueTime <= nextCleanup)
-        {
-            var now = timeProvider.GetUtcNow();
-            nextCleanup = dueTime.Value;
-            var seconds = Math.Max(settings.ExpirationScanFrequency.TotalSeconds, (dueTime.Value - now).TotalSeconds);
-            cleanupTimer.Change(TimeSpan.FromSeconds(seconds), Timeout.InfiniteTimeSpan);
+            var now = timeProvider.GetUtcNow().UtcTicks;
+            nextCleanup = dueTimeTicks.Value;
+            var seconds = Math.Max(settings.ExpirationScanFrequency.Ticks, dueTimeTicks.Value - now);
+            cleanupTimer.Change(TimeSpan.FromTicks(seconds), Timeout.InfiniteTimeSpan);
         }
     }
 
@@ -291,12 +330,12 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     private long RemoveExpired()
     {
-        nextCleanup = DateTimeOffset.MaxValue;
+        nextCleanup = DateTimeOffset.MaxValue.UtcTicks;
         long removedBytes = 0;
-        var now = timeProvider.GetUtcNow();
+        var now = timeProvider.GetUtcNow().UtcTicks;
         while (metadata.TryDequeueTTL(out var item))
         {
-            if (item.Expiration <= now)
+            if (item.ExpirationTicks <= now)
             {
                 Remove(item);
                 removedBytes += item.SizeBytes;
@@ -304,7 +343,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             else
             {
                 metadata.EnqueueTtl(item);
-                QueueCleanup(item.Expiration);
+                QueueCleanup(item.ExpirationTicks);
                 break;
             }
         }

@@ -4,21 +4,21 @@ internal sealed record FileCacheEntry(
     string Key,
     string Path,
     long SizeBytes,
-    DateTimeOffset CreatedUtc,
-    DateTimeOffset LastAccessUtc)
+    long CreatedTicks,
+    long LastAccessTicks)
 {
-    public int Version { get; init; } = 0;
-    public int AccessCount { get; init; } = 0;
-    public DateTimeOffset? AbsoluteExpiration { get; init; }
-    public TimeSpan? SlidingExpiration { get; init; }
-    public DateTimeOffset? Expiration
+    public ulong Version { get; init; } = 0;
+    public ulong AccessCount { get; init; } = 0;
+    public long? AbsoluteExpirationTicks { get; init; }
+    public long? SlidingExpirationTicks { get; init; }
+    public long? ExpirationTicks
     {
         get
         {
-            DateTimeOffset? sliding = SlidingExpiration.HasValue ? LastAccessUtc.Add(SlidingExpiration.Value) : null;
-            return (sliding.HasValue && AbsoluteExpiration.HasValue)
-            ? (sliding < AbsoluteExpiration ? sliding : AbsoluteExpiration)
-            : (sliding ?? AbsoluteExpiration);
+            long? sliding = SlidingExpirationTicks.HasValue ? LastAccessTicks + SlidingExpirationTicks.Value : null;
+            return (sliding.HasValue && AbsoluteExpirationTicks.HasValue)
+            ? (sliding < AbsoluteExpirationTicks ? sliding : AbsoluteExpirationTicks)
+            : (sliding ?? AbsoluteExpirationTicks);
         }
     }
 }

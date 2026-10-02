@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using System.Buffers;
+using System.Security.Cryptography;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 using Microsoft.Extensions.Caching.Distributed;
@@ -12,8 +13,6 @@ public class BenchmarkTests
     [Test]
     public void Run_Eryri_FileDistributedCache_Tests() => BenchmarkRunner.Run<Eryri_FileDistributedCache_Tests>();
     [Test]
-    public void Run_Net_DistributedFileStoreCache_Tests() => BenchmarkRunner.Run<Net_DistributedFileStoreCache_Tests>();
-    [Test]
     public void Run_DamianH_FileDistributedCache_Tests() => BenchmarkRunner.Run<DamianH_FileDistributedCache_Tests>();
 
     public class Eryri_FileDistributedCache_Tests : TestBase
@@ -21,20 +20,6 @@ public class BenchmarkTests
         public Eryri_FileDistributedCache_Tests()
         {
             services.AddDistributedFileCache(d => d.SizeLimitBytes = SizeLimit);
-        }
-    }
-
-    public class Net_DistributedFileStoreCache_Tests : TestBase
-    {
-        public Net_DistributedFileStoreCache_Tests()
-        {
-            Net.DistributedFileStoreCache.RegisterDistributedFileStoreCache.AddDistributedFileStoreCache(services, d =>
-            {
-                d.PathToCacheFileDirectory = cacheDirectory.FullName;
-                d.SecondPartOfCacheFileName = "cache";
-                d.MaxBytesInJsonCacheFile = SizeLimit;
-                d.WhichVersion = Net.DistributedFileStoreCache.FileStoreCacheVersions.IDistributedCache;
-            });
         }
     }
 
@@ -54,18 +39,27 @@ public class BenchmarkTests
     [SimpleJob(
         warmupCount: 1,
         iterationCount: 5,
-        invocationCount: NumberOfItemsUntilFull)]
+        invocationCount: 30)]
     public abstract class TestBase : IDisposable
     {
+        [Params(100)]
+        public int ParallelOperations { get; set; }
         public const int NumberOfItemsUntilFull = SizeLimit / PayloadSize;
         public const int PayloadSize = 4 << 10; // 4 KiB
         public const int SizeLimit = 1 << 20; // 1 MiB
         protected readonly DirectoryInfo cacheDirectory = Directory.CreateTempSubdirectory();
         private string key = Guid.NewGuid().ToString("N");
         private readonly byte[] payload = RandomNumberGenerator.GetBytes(PayloadSize);
+        private readonly DistributedCacheEntryOptions cacheEntryOptions = new DistributedCacheEntryOptions
+        {
+            AbsoluteExpiration = DateTimeOffset.UtcNow.AddDays(2),
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1),
+            SlidingExpiration = TimeSpan.FromMinutes(10)
+        };
         protected readonly IServiceCollection services = new ServiceCollection();
         private IDisposable? disposable;
         private IDistributedCache? cache;
+        private IBufferDistributedCache? bufferedCache;
 
         [GlobalSetup]
         public void Setup()
@@ -73,6 +67,13 @@ public class BenchmarkTests
             var sp = services.BuildServiceProvider();
             disposable = sp;
             cache = sp.GetRequiredService<IDistributedCache>();
+            bufferedCache = sp.GetService<IBufferDistributedCache>();
+
+            Parallel.For(0, NumberOfItemsUntilFull, i =>
+            {
+                var key = Guid.NewGuid().ToString("N");
+                cache.Set(key, payload, cacheEntryOptions);
+            });
         }
 
         [GlobalCleanup]
@@ -92,37 +93,93 @@ public class BenchmarkTests
         }
 
         [Benchmark]
-        public void Write()
+        public void Set()
         {
-            var key = Guid.NewGuid().ToString("N");
-            cache!.Set(key, payload);
-            this.key = key;
-        }
-
-        [Benchmark]
-        public async Task WriteAsync()
-        {
-            var key = Guid.NewGuid().ToString("N");
-            await cache!.SetAsync(key, payload);
-            this.key = key;
-        }
-
-        [Benchmark]
-        public void Read()
-        {
-            if (cache!.Get(key) == null)
+            Parallel.For(0, ParallelOperations, i =>
             {
-                cache!.Set(key, payload);
-            }
+                var key = Guid.NewGuid().ToString("N");
+                cache!.Set(key, payload, cacheEntryOptions);
+            });
         }
 
         [Benchmark]
-        public async Task ReadAsync()
+        public void SetBuffered()
         {
-            if (await cache!.GetAsync(key) == null)
+            Parallel.For(0, ParallelOperations, i =>
             {
-                await cache!.SetAsync(key, payload);
-            }
+                var key = Guid.NewGuid().ToString("N");
+                bufferedCache!.Set(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
+            });
+        }
+
+        [Benchmark]
+        public async Task SetAsync()
+        {
+            await Parallel.ForAsync(0, ParallelOperations, async (i, _) =>
+            {
+                var key = Guid.NewGuid().ToString("N");
+                await cache!.SetAsync(key, payload, cacheEntryOptions);
+            });
+        }
+
+        [Benchmark]
+        public async Task SetBufferedAsync()
+        {
+            await Parallel.ForAsync(0, ParallelOperations, async (i, _) =>
+            {
+                var key = Guid.NewGuid().ToString("N");
+                await bufferedCache!.SetAsync(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
+            });
+        }
+
+        [Benchmark]
+        public void Get()
+        {
+            Parallel.For(0, ParallelOperations, i =>
+            {
+                if (cache!.Get(key) == null)
+                {
+                    cache!.Set(key, payload, cacheEntryOptions);
+                }
+            });
+        }
+
+        [Benchmark]
+        public void GetBuffered()
+        {
+            Parallel.For(0, ParallelOperations, i =>
+            {
+                var buffer = new ArrayBufferWriter<byte>(payload.Length);
+                if (bufferedCache!.TryGet(key, buffer))
+                {
+                    bufferedCache!.Set(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
+                }
+            });
+        }
+
+        [Benchmark]
+        public async Task GetAsync()
+        {
+            await Parallel.ForAsync(0, ParallelOperations, async (i, _) =>
+            {
+                if (await cache!.GetAsync(key) == null)
+                {
+                    await cache!.SetAsync(key, payload, cacheEntryOptions);
+                }
+            });
+        }
+
+        [Benchmark]
+        public async Task GetBufferedAsync()
+        {
+            await Parallel.ForAsync(0, ParallelOperations, async (i, _) =>
+            {
+                var buffer = new ArrayBufferWriter<byte>(payload.Length);
+                if (!await bufferedCache!.TryGetAsync(key, buffer))
+                {
+                    await bufferedCache!.SetAsync(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
+                }
+            });
         }
     }
 }

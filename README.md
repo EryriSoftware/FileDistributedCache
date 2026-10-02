@@ -137,7 +137,8 @@ The benchmark that matters most for this package is **sustained operation with r
 
 - PayloadSize=4KiB
 - CacheSizeLimit=1MiB
-- InvocationCount=256 // number of items to fill the cache
+- ParallelOperations=100
+- InvocationCount=30
 - IterationCount=5
 - UnrollFactor=1  
 - WarmupCount=1
@@ -146,38 +147,41 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 > 1s == 1000ms, 1ms == 1000us, 1us == 1000ns
 
 ### [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
-| Method     | Mean     | Error     | StdDev   |
-|----------- |---------:|----------:|---------:|
-| Write      | 469.1 us | 187.86 us | 48.79 us |
-| WriteAsync | 556.5 us | 262.33 us | 40.60 us |
-| Read       | 207.8 us | 150.26 us | 39.02 us |
-| ReadAsync  | 285.3 us |  53.24 us |  8.24 us |
+| Method           | Mean      | Error     | StdDev    | Median    |
+|----------------- |----------:|----------:|----------:|----------:|
+| Set              | 31.763 ms | 25.644 ms |  3.968 ms | 33.555 ms |
+| SetBuffered      | 44.576 ms | 74.168 ms | 19.261 ms | 35.198 ms |
+| SetAsync         | 33.106 ms | 35.982 ms |  5.568 ms | 35.104 ms |
+| SetBufferedAsync | 30.608 ms | 15.294 ms |  3.971 ms | 30.953 ms |
+| Get              |  6.046 ms |  1.094 ms |  0.284 ms |  6.110 ms |
+| GetBuffered      |  0.067 ms |  0.022 ms |  0.003 ms |  0.067 ms |
+| GetAsync         |  6.421 ms |  0.359 ms |  0.055 ms |  6.435 ms |
+| GetBufferedAsync |  7.362 ms |  2.345 ms |  0.609 ms |  7.061 ms |
 
 > [!Note]
-> This cache is designed for single-process use.
-
-### [Net.DistributedFileStoreCache](https://www.nuget.org/packages/Net.DistributedFileStoreCache)
-| Method     | Mean          | Error      | StdDev      |
-|----------- |--------------:|-----------:|------------:|
-| Write      | 10,094.749 us | 517.489 us |  80.0820 us |
-| WriteAsync | 10,164.613 us | 573.764 us | 149.0046 us |
-| Read       |      9.998 us |  11.127 us |   2.8895 us |
-| ReadAsync  |      8.556 us |   5.697 us |   0.8817 us |
-
-> [!Warning]
-> Retains the entire cache in-memory. The filesystem is used as persistance/distribution mechanism.
-
+> This cache is ephemeral, designed for single-process use.
 
 ### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
-| Method     | Mean       | Error       | StdDev    |
-|----------- |-----------:|------------:|----------:|
-| Write      | 1,396.8 us |   313.64 us |  81.45 us |
-| WriteAsync | 1,883.4 us | 4,277.72 us | 661.98 us |
-| Read       |   159.2 us |    28.91 us |   4.47 us |
-| ReadAsync  |   242.7 us |   110.13 us |  17.04 us |
+| Method           | Mean      | Error       | StdDev     | Median    |
+|----------------- |----------:|------------:|-----------:|----------:|
+| Set              | 68.738 ms | 142.9623 ms | 22.1236 ms | 65.681 ms |
+| SetBuffered      | 69.703 ms |  90.9287 ms | 23.6139 ms | 65.810 ms |
+| SetAsync         | 76.828 ms | 117.5669 ms | 30.5318 ms | 59.628 ms |
+| SetBufferedAsync | 56.322 ms |  54.4735 ms |  8.4298 ms | 53.331 ms |
+| Get              | 13.735 ms |   4.4539 ms |  0.6892 ms | 13.693 ms |
+| GetBuffered      |  1.028 ms |   0.1026 ms |  0.0266 ms |  1.033 ms |
+| GetAsync         | 17.698 ms |   1.2860 ms |  0.3340 ms | 17.499 ms |
+| GetBufferedAsync | 17.886 ms |   2.2197 ms |  0.3435 ms | 17.830 ms |
 
 > [!Note]
 > This cache is designed for single-process use.
 
 > [!Warning]
 > Size limits are eventual, not strict. Write methods publishes without checking MaxTotalSize or MaxEntries; eviction only acts on its periodic scan.
+
+### [Net.DistributedFileStoreCache](https://www.nuget.org/packages/Net.DistributedFileStoreCache)
+
+> [!Warning]
+> - Retains the entire cache in-memory. The filesystem is used as persistance/distribution mechanism.
+> - Doesn't support SlidingExpiration.
+> - Doesn't implement `IBufferDistributedCache`.
