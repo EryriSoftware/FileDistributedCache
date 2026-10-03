@@ -13,6 +13,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 {
     public FileDistributedCache(
         TimeProvider timeProvider,
+        FileCacheManifest manifest,
         IOptions<FileCacheOptions> optionsAccessor,
         ILogger<FileDistributedCache>? logger = null)
     {
@@ -21,7 +22,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         minScanFrequencyTicks = settings.ExpirationScanFrequency.Ticks;
         this.logger = logger;
         cleanupTimer = timeProvider.CreateTimer(_ => RemoveExpired(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-        manifest = new FileCacheManifest(optionsAccessor.Value.EvictionPolicy);
+        this.manifest = manifest;
         cacheDirectory = Directory.CreateTempSubdirectory();
     }
 

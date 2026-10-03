@@ -1,11 +1,13 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using Eryri.Extensions.Caching.FileSystem.Models;
+using Microsoft.Extensions.Options;
 
 namespace Eryri.Extensions.Caching.FileSystem.Domain;
 
-internal class FileCacheManifest(EvictionPolicy policy)
+internal class FileCacheManifest(IOptions<FileCacheOptions> options)
 {
+    private readonly EvictionPolicy policy = options.Value.EvictionPolicy;
     private long _size;
     public long Size => Volatile.Read(ref _size);
     public int Count => files.Count;
