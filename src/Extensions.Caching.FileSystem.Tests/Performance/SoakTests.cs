@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+﻿using System.Buffers;
 using System.Security.Cryptography;
 using Eryri.Extensions.Caching.FileSystem.Tests.Contexts;
 using Microsoft.Extensions.Caching.Distributed;
@@ -34,6 +34,10 @@ public class SoakTests
         {
             var key = Guid.NewGuid().ToString("N");
             ctx.Cache.Set(key, Payload, options);
+            ctx.BufferCache.Set(key, new ReadOnlySequence<byte>(Payload), options);
+
+            ctx.Cache.Get(key);
+            ctx.BufferCache.TryGet(key, new ArrayBufferWriter<byte>());
         });
     }
 
@@ -57,7 +61,15 @@ public class SoakTests
         await Parallel.ForAsync(0, EntriesCount, TestContext.CurrentContext.CancellationToken, async (i, ct) =>
         {
             var key = Guid.NewGuid().ToString("N");
-            await ctx.Cache.SetAsync(key, Payload, options, ct);
+            await Task.WhenAll([
+                ctx.Cache.SetAsync(key, Payload, options, ct),
+                ctx.BufferCache.SetAsync(key, new ReadOnlySequence<byte>(Payload), options, ct).AsTask()
+            ]);
+
+            await Task.WhenAll([
+                ctx.Cache.GetAsync(key, ct),
+                ctx.BufferCache.TryGetAsync(key, new ArrayBufferWriter<byte>(), ct).AsTask()
+            ]);
         });
     }
 }
