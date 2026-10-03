@@ -1,4 +1,4 @@
-﻿namespace Eryri.Extensions.Caching.FileSystem.Models;
+﻿namespace Eryri.Extensions.Caching.FileSystem.Domain;
 
 internal record struct SequencedValue<T>(T Value) : IComparable<SequencedValue<T>>
 {

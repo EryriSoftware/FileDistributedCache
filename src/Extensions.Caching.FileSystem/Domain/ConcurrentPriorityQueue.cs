@@ -1,7 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 
-namespace Eryri.Extensions.Caching.FileSystem.Models;
+namespace Eryri.Extensions.Caching.FileSystem.Domain;
 
 internal class ConcurrentPriorityQueue<TElement, TPriority>
 {
