@@ -18,6 +18,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         this.timeProvider = timeProvider;
         settings = optionsAccessor.Value;
+        minScanFrequencyTicks = settings.ExpirationScanFrequency.Ticks;
         this.logger = logger;
         cleanupTimer = timeProvider.CreateTimer(_ => RemoveExpired(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         manifest = new FileCacheManifest(optionsAccessor.Value.EvictionPolicy);
@@ -28,6 +29,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     private bool isDisposed = false;
     private readonly ILogger? logger;
     private readonly FileCacheOptions settings;
+    private readonly long minScanFrequencyTicks;
     private readonly TimeProvider timeProvider;
     private readonly DirectoryInfo cacheDirectory;
     private readonly FileCacheManifest manifest;
@@ -325,11 +327,10 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     private void QueueCleanup(long? dueTimeTicks)
     {
-        if (dueTimeTicks.HasValue && dueTimeTicks <= nextCleanup)
+        if (dueTimeTicks is { } dueTicks && dueTicks <= nextCleanup)
         {
-            var now = timeProvider.GetUtcNow().UtcTicks;
-            nextCleanup = dueTimeTicks.Value;
-            var seconds = Math.Max(settings.ExpirationScanFrequency.Ticks, dueTimeTicks.Value - now);
+            nextCleanup = dueTicks;
+            var seconds = Math.Max(minScanFrequencyTicks, dueTicks - timeProvider.GetUtcNow().UtcTicks);
             cleanupTimer.Change(TimeSpan.FromTicks(seconds), Timeout.InfiniteTimeSpan);
         }
     }
