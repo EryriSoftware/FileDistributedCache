@@ -24,8 +24,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         cacheDirectory = Directory.CreateTempSubdirectory();
     }
 
-    private readonly ConcurrentDictionary<string, DirectoryInfo> directories = new (StringComparer.OrdinalIgnoreCase);
-    private const int ShardingDepth = 3;
+    private readonly ConcurrentDictionary<string, Lazy<DirectoryInfo>> directories = new (StringComparer.OrdinalIgnoreCase);
     private bool isDisposed = false;
     private readonly ILogger? logger;
     private readonly FileCacheOptions settings;
@@ -262,20 +261,38 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         }
     }
 
+    private int ShardingDepth()
+    {
+        const long itemsPerFolder = 1 << 10; // ( * 1024 )
+        var count = manifest.Count;
+
+        for (var depth = 1; depth < 10; depth++)
+        {
+            if (count < itemsPerFolder * (1L << (depth * 4)))
+            {
+                return depth;
+            }
+        }
+
+        return 10;
+    }
+
     private FileCacheMetadata CreateFileEntry(string key, long payloadSize, DistributedCacheEntryOptions options)
     {
         var id = Guid.NewGuid().ToString("N");
+        var shard = id[..ShardingDepth()];
         var now = timeProvider.GetUtcNow().UtcTicks;
-        var shard = id[..ShardingDepth];
         var path = Path.Combine(cacheDirectory.FullName, shard, $"{id}.bytes");
-        directories.GetOrAdd(shard, static (shard, root) => Directory.CreateDirectory(Path.Combine(root.FullName, shard)), cacheDirectory);
+        var directory = directories
+            .GetOrAdd(shard, static (shard, root) => new Lazy<DirectoryInfo>(() => Directory.CreateDirectory(Path.Combine(root.FullName, shard))), cacheDirectory)
+            .Value; // Ensure the directory is created before writing the file
         return new FileCacheMetadata(
             Key: key,
             Path: path,
             SizeBytes: payloadSize,
-            CreatedTicks: now,
-            LastAccessTicks: now)
+            CreatedTicks: now)
         {
+            LastAccessTicks = now,
             AbsoluteExpirationTicks = options.AbsoluteExpiration.HasValue
                 ? options.AbsoluteExpiration.Value.UtcTicks
                 : options.AbsoluteExpirationRelativeToNow.HasValue

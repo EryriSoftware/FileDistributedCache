@@ -150,31 +150,31 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 > 1s == 1000ms, 1ms == 1000us, 1us == 1000ns
 
 ### [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
-| Method           | Mean      | Error     | StdDev    | Median    |
-|----------------- |----------:|----------:|----------:|----------:|
-| Set              | 31.763 ms | 25.644 ms |  3.968 ms | 33.555 ms |
-| SetBuffered      | 44.576 ms | 74.168 ms | 19.261 ms | 35.198 ms |
-| SetAsync         | 33.106 ms | 35.982 ms |  5.568 ms | 35.104 ms |
-| SetBufferedAsync | 30.608 ms | 15.294 ms |  3.971 ms | 30.953 ms |
-| Get              |  6.046 ms |  1.094 ms |  0.284 ms |  6.110 ms |
-| GetBuffered      |  0.067 ms |  0.022 ms |  0.003 ms |  0.067 ms |
-| GetAsync         |  6.421 ms |  0.359 ms |  0.055 ms |  6.435 ms |
-| GetBufferedAsync |  7.362 ms |  2.345 ms |  0.609 ms |  7.061 ms |
+| Method           | Mean      | Error      | StdDev    | Median    |
+|----------------- |----------:|-----------:|----------:|----------:|
+| Set              | 16.940 ms |  30.690 ms |  7.970 ms | 11.880 ms |
+| SetBuffered      | 20.029 ms |  48.741 ms | 12.658 ms | 11.633 ms |
+| SetAsync         | 16.594 ms |  52.872 ms |  8.182 ms | 12.895 ms |
+| SetBufferedAsync | 38.859 ms | 129.973 ms | 33.753 ms | 20.163 ms |
+| Get              |  6.126 ms |   1.100 ms |  0.285 ms |  6.269 ms |
+| GetBuffered      |  0.082 ms |   0.025 ms |  0.003 ms |  0.082 ms |
+| GetAsync         |  6.688 ms |   1.191 ms |  0.309 ms |  6.519 ms |
+| GetBufferedAsync |  6.858 ms |   0.666 ms |  0.173 ms |  6.817 ms |
 
 > [!Note]
 > This cache is ephemeral, designed for single-process use.
 
 ### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
-| Method           | Mean      | Error       | StdDev     | Median    |
-|----------------- |----------:|------------:|-----------:|----------:|
-| Set              | 68.738 ms | 142.9623 ms | 22.1236 ms | 65.681 ms |
-| SetBuffered      | 69.703 ms |  90.9287 ms | 23.6139 ms | 65.810 ms |
-| SetAsync         | 76.828 ms | 117.5669 ms | 30.5318 ms | 59.628 ms |
-| SetBufferedAsync | 56.322 ms |  54.4735 ms |  8.4298 ms | 53.331 ms |
-| Get              | 13.735 ms |   4.4539 ms |  0.6892 ms | 13.693 ms |
-| GetBuffered      |  1.028 ms |   0.1026 ms |  0.0266 ms |  1.033 ms |
-| GetAsync         | 17.698 ms |   1.2860 ms |  0.3340 ms | 17.499 ms |
-| GetBufferedAsync | 17.886 ms |   2.2197 ms |  0.3435 ms | 17.830 ms |
+| Method           | Mean       | Error       | StdDev      | Median     |
+|----------------- |-----------:|------------:|------------:|-----------:|
+| Set              | 214.290 ms | 262.8838 ms |  68.2701 ms | 245.964 ms |
+| SetBuffered      |  75.283 ms | 167.7966 ms |  25.9667 ms |  67.944 ms |
+| SetAsync         |  73.989 ms |  67.4653 ms |  17.5205 ms |  68.776 ms |
+| SetBufferedAsync | 225.224 ms | 621.0536 ms | 161.2856 ms | 162.831 ms |
+| Get              |  12.131 ms |   1.0967 ms |   0.2848 ms |  12.126 ms |
+| GetBuffered      |   1.175 ms |   0.2063 ms |   0.0319 ms |   1.165 ms |
+| GetAsync         |  20.600 ms |   3.2197 ms |   0.4983 ms |  20.599 ms |
+| GetBufferedAsync |  24.006 ms |  21.1631 ms |   3.2750 ms |  25.418 ms |
 
 > [!Note]
 > This cache is designed for single-process use.

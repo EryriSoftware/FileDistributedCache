@@ -8,6 +8,7 @@ internal class FileCacheManifest(EvictionPolicy policy)
 {
     private long _size;
     public long Size => Volatile.Read(ref _size);
+    public int Count => files.Count;
     private readonly ConcurrentDictionary<string, FileCacheMetadata> files = new (StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentPriorityQueue<PriorityCandidate, SequencedValue<long>> lruQueue = new ();
     private readonly ConcurrentPriorityQueue<PriorityCandidate, ulong> lfuQueue = new ();

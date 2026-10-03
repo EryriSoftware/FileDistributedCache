@@ -10,6 +10,8 @@ namespace Eryri.Extensions.Caching.FileSystem.Tests.Benchmark;
 [TestFixture]
 public class BenchmarkTests
 {
+    private static CancellationToken CancellationToken => TestContext.CurrentContext.CancellationToken;
+
     [Test]
     public void Run_Eryri_FileDistributedCache_Tests() => BenchmarkRunner.Run<Eryri_FileDistributedCache_Tests>();
     [Test]
@@ -115,20 +117,20 @@ public class BenchmarkTests
         [Benchmark]
         public async Task SetAsync()
         {
-            await Parallel.ForAsync(0, ParallelOperations, async (i, _) =>
+            await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (i, ct) =>
             {
                 var key = Guid.NewGuid().ToString("N");
-                await cache!.SetAsync(key, payload, cacheEntryOptions);
+                await cache!.SetAsync(key, payload, cacheEntryOptions, ct);
             });
         }
 
         [Benchmark]
         public async Task SetBufferedAsync()
         {
-            await Parallel.ForAsync(0, ParallelOperations, async (i, _) =>
+            await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (i, ct) =>
             {
                 var key = Guid.NewGuid().ToString("N");
-                await bufferedCache!.SetAsync(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
+                await bufferedCache!.SetAsync(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions, ct);
             });
         }
 
@@ -160,11 +162,11 @@ public class BenchmarkTests
         [Benchmark]
         public async Task GetAsync()
         {
-            await Parallel.ForAsync(0, ParallelOperations, async (i, _) =>
+            await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (i, ct) =>
             {
-                if (await cache!.GetAsync(key) == null)
+                if (await cache!.GetAsync(key, ct) == null)
                 {
-                    await cache!.SetAsync(key, payload, cacheEntryOptions);
+                    await cache!.SetAsync(key, payload, cacheEntryOptions, ct);
                 }
             });
         }
@@ -172,12 +174,12 @@ public class BenchmarkTests
         [Benchmark]
         public async Task GetBufferedAsync()
         {
-            await Parallel.ForAsync(0, ParallelOperations, async (i, _) =>
+            await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (i, ct) =>
             {
                 var buffer = new ArrayBufferWriter<byte>(payload.Length);
-                if (!await bufferedCache!.TryGetAsync(key, buffer))
+                if (!await bufferedCache!.TryGetAsync(key, buffer, ct))
                 {
-                    await bufferedCache!.SetAsync(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
+                    await bufferedCache!.SetAsync(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions, ct);
                 }
             });
         }

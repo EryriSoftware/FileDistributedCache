@@ -4,21 +4,47 @@ internal sealed record FileCacheMetadata(
     string Key,
     string Path,
     long SizeBytes,
-    long CreatedTicks,
-    long LastAccessTicks)
+    long CreatedTicks)
 {
     public ulong Version { get; init; } = 0;
     public ulong AccessCount { get; init; } = 0;
-    public long? AbsoluteExpirationTicks { get; init; }
-    public long? SlidingExpirationTicks { get; init; }
-    public long? ExpirationTicks
+    public long LastAccessTicks
     {
-        get
+        get => field;
+        init
         {
-            long? sliding = SlidingExpirationTicks.HasValue ? LastAccessTicks + SlidingExpirationTicks.Value : null;
-            return (sliding.HasValue && AbsoluteExpirationTicks.HasValue)
-            ? (sliding < AbsoluteExpirationTicks ? sliding : AbsoluteExpirationTicks)
-            : (sliding ?? AbsoluteExpirationTicks);
+            field = value;
+            CalculateExpirationTicks();
         }
+    }
+
+    public long? AbsoluteExpirationTicks
+    {
+        get => field;
+        init
+        {
+            field = value;
+            CalculateExpirationTicks();
+        }
+    }
+
+    public long? SlidingExpirationTicks
+    {
+        get => field;
+        init
+        {
+            field = value;
+            CalculateExpirationTicks();
+        }
+    }
+
+    public long? ExpirationTicks { get; private set; }
+
+    private void CalculateExpirationTicks()
+    {
+        long? sliding = SlidingExpirationTicks.HasValue ? LastAccessTicks + SlidingExpirationTicks.Value : null;
+        ExpirationTicks = (sliding.HasValue && AbsoluteExpirationTicks.HasValue)
+        ? (sliding < AbsoluteExpirationTicks ? sliding : AbsoluteExpirationTicks)
+        : (sliding ?? AbsoluteExpirationTicks);
     }
 }
