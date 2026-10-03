@@ -20,7 +20,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         settings = optionsAccessor.Value;
         this.logger = logger;
         cleanupTimer = timeProvider.CreateTimer(_ => RemoveExpired(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-        metadata = new FileCacheMetadata(optionsAccessor.Value.EvictionPolicy);
+        manifest = new FileCacheManifest(optionsAccessor.Value.EvictionPolicy);
         cacheDirectory = Directory.CreateTempSubdirectory();
     }
 
@@ -31,15 +31,15 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     private readonly FileCacheOptions settings;
     private readonly TimeProvider timeProvider;
     private readonly DirectoryInfo cacheDirectory;
-    private readonly FileCacheMetadata metadata;
+    private readonly FileCacheManifest manifest;
     private long nextCleanup = DateTimeOffset.MaxValue.UtcTicks;
     private readonly ITimer cleanupTimer;
 
-    public long Size => metadata.Size;
+    public long Size => manifest.Size;
 
     public bool TryGet(string key, IBufferWriter<byte> destination)
     {
-        if (metadata.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
+        if (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
         {
             UpdateEntry(key, true);
             try
@@ -61,7 +61,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     public byte[]? Get(string key)
     {
-        if (metadata.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
+        if (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
         {
             UpdateEntry(key, true);
             try
@@ -82,7 +82,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     public async ValueTask<bool> TryGetAsync(string key, IBufferWriter<byte> destination, CancellationToken cancellationToken)
     {
-        if (metadata.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
+        if (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
         {
             UpdateEntry(key, true);
             try
@@ -104,7 +104,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     public async Task<byte[]?> GetAsync(string key, CancellationToken cancellationToken)
     {
-        if (metadata.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
+        if (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
         {
             UpdateEntry(key, true);
             try
@@ -200,7 +200,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     private void UpdateEntry(string key, bool isAccessed)
     {
-        while (metadata.TryGetValue(key, out var entry))
+        while (manifest.TryGetValue(key, out var entry))
         {
             var newEntry = entry with
             {
@@ -208,7 +208,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                 AccessCount = isAccessed ? entry.AccessCount + 1 : entry.AccessCount
             };
 
-            if (metadata.TryUpdate(key, newEntry, entry))
+            if (manifest.TryUpdate(key, newEntry, entry))
             {
                 QueueCleanup(newEntry.ExpirationTicks);
                 return;
@@ -216,7 +216,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         }
     }
 
-    private bool RemoveIfExpired(FileCacheEntry entry) =>
+    private bool RemoveIfExpired(FileCacheMetadata entry) =>
         entry.ExpirationTicks is { } expiry && expiry < timeProvider.GetUtcNow().UtcTicks && Remove(entry);
 
     public Task RefreshAsync(string key, CancellationToken cancellationToken)
@@ -227,7 +227,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     public void Remove(string key)
     {
-        if (metadata.TryRemove(key, out var entry))
+        if (manifest.TryRemove(key, out var entry))
         {
             TryDelete(entry.Path);
         }
@@ -239,9 +239,9 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         return Task.CompletedTask;
     }
 
-    private bool Remove(FileCacheEntry entry)
+    private bool Remove(FileCacheMetadata entry)
     {
-        if (metadata.TryRemove(new KeyValuePair<string, FileCacheEntry>(entry.Key, entry)))
+        if (manifest.TryRemove(new KeyValuePair<string, FileCacheMetadata>(entry.Key, entry)))
         {
             TryDelete(entry.Path);
             return true;
@@ -262,14 +262,14 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         }
     }
 
-    private FileCacheEntry CreateFileEntry(string key, long payloadSize, DistributedCacheEntryOptions options)
+    private FileCacheMetadata CreateFileEntry(string key, long payloadSize, DistributedCacheEntryOptions options)
     {
         var id = Guid.NewGuid().ToString("N");
         var now = timeProvider.GetUtcNow().UtcTicks;
         var shard = id[..ShardingDepth];
         var path = Path.Combine(cacheDirectory.FullName, shard, $"{id}.bytes");
         directories.GetOrAdd(shard, static (shard, root) => Directory.CreateDirectory(Path.Combine(root.FullName, shard)), cacheDirectory);
-        return new FileCacheEntry(
+        return new FileCacheMetadata(
             Key: key,
             Path: path,
             SizeBytes: payloadSize,
@@ -287,18 +287,18 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         };
     }
 
-    private void PublishEntry(FileCacheEntry entry)
+    private void PublishEntry(FileCacheMetadata entry)
     {
         while (true)
         {
-            if (metadata.TryGetValue(entry.Key, out var existing)
-                && metadata.TryUpdate(entry.Key, entry, existing))
+            if (manifest.TryGetValue(entry.Key, out var existing)
+                && manifest.TryUpdate(entry.Key, entry, existing))
             {
                 TryDelete(existing.Path);
                 QueueCleanup(entry.ExpirationTicks);
                 return;
             }
-            else if (metadata.TryAdd(entry.Key, entry))
+            else if (manifest.TryAdd(entry.Key, entry))
             {
                 QueueCleanup(entry.ExpirationTicks);
                 return;
@@ -319,9 +319,9 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     public void Compact([Range(0, 1)] decimal percentage = 0)
     {
-        var requiredFreeSpace = Convert.ToInt64(metadata.Size * percentage);
+        var requiredFreeSpace = Convert.ToInt64(manifest.Size * percentage);
 
-        while (requiredFreeSpace > 0 && metadata.TryDequeueEvictionPolicy(out var item))
+        while (requiredFreeSpace > 0 && manifest.TryDequeueEvictionPolicy(out var item))
         {
             Remove(item);
             requiredFreeSpace -= item.SizeBytes;
@@ -333,7 +333,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         nextCleanup = DateTimeOffset.MaxValue.UtcTicks;
         long removedBytes = 0;
         var now = timeProvider.GetUtcNow().UtcTicks;
-        while (metadata.TryDequeueTTL(out var item))
+        while (manifest.TryDequeueTTL(out var item))
         {
             if (item.ExpirationTicks <= now)
             {
@@ -342,7 +342,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             }
             else
             {
-                metadata.EnqueueTtl(item);
+                manifest.EnqueueTtl(item);
                 QueueCleanup(item.ExpirationTicks);
                 break;
             }
@@ -355,8 +355,8 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         if (settings.SizeLimitBytes > 0 && requiredFreeSpace < settings.SizeLimitBytes)
         {
-            while (requiredFreeSpace + metadata.Size > settings.SizeLimitBytes
-                && metadata.TryDequeueEvictionPolicy(out var item))
+            while (requiredFreeSpace + manifest.Size > settings.SizeLimitBytes
+                && manifest.TryDequeueEvictionPolicy(out var item))
             {
                 Remove(item);
             }
@@ -370,7 +370,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             isDisposed = true;
             cacheDirectory.Delete(recursive: true);
             cleanupTimer.Dispose();
-            metadata.Clear();
+            manifest.Clear();
         }
     }
 }
