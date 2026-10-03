@@ -63,4 +63,10 @@ public record FileCacheOptions
     /// Gets or sets the default Time To Live for items an absolute expiry set. Calculated from the time the item is added to the cache.
     /// </summary>
     public TimeSpan? DefaultAbsoluteExpirationRelativeToNow = null;
+
+    /// <summary>
+    /// Gets or sets the directory where cache files are stored.
+    /// Defaults to a tmp directoryy that's deletet when the application shuts down.
+    /// </summary>
+    public string? CacheDirectory { get; set; }
 }

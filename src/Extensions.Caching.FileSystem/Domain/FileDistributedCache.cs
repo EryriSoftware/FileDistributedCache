@@ -14,6 +14,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     public FileDistributedCache(
         TimeProvider timeProvider,
         FileCacheManifest manifest,
+        CacheDirectoryOwner directoryOwner,
         IOptions<FileCacheOptions> optionsAccessor,
         ILogger<FileDistributedCache>? logger = null)
     {
@@ -23,7 +24,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         this.logger = logger;
         cleanupTimer = timeProvider.CreateTimer(_ => RemoveExpired(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         this.manifest = manifest;
-        cacheDirectory = Directory.CreateTempSubdirectory();
+        cacheDirectory = directoryOwner.Directory;
     }
 
     private readonly ConcurrentDictionary<string, Lazy<DirectoryInfo>> directories = new (StringComparer.OrdinalIgnoreCase);
@@ -387,9 +388,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         if (!isDisposed)
         {
             isDisposed = true;
-            cacheDirectory.Delete(recursive: true);
             cleanupTimer.Dispose();
-            manifest.Clear();
         }
     }
 }
