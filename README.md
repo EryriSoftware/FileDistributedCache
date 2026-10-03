@@ -3,9 +3,13 @@
 [![NuGet](https://img.shields.io/nuget/v/Eryri.FileDistributedCache.svg)](https://www.nuget.org/packages/Eryri.FileDistributedCache)
 [![NuGet Downloads](https://img.shields.io/nuget/dt/Eryri.FileDistributedCache.svg)](https://www.nuget.org/packages/Eryri.FileDistributedCache)
 
-**Keep more reusable data without giving more RAM to your cache—or running another cache service.** Eryri.FileDistributedCache stores disposable cache values on the local filesystem behind .NET's `IDistributedCache` and `IBufferDistributedCache` APIs. Give it a byte limit and it evicts entries to make room *before* admitting a new write; expired entries are cleaned up automatically.
+**Keep more reusable data without giving more RAM to your cache—or running another cache service.** Eryri.FileDistributedCache stores disposable cache values on the local filesystem behind .NET's `IDistributedCache` and `IBufferDistributedCache` APIs.
 
-It is built for a **single process**, with concurrent access, configurable eviction, synchronous and asynchronous operations, and Native AOT compatibility. Use it directly when local disk is the right cache, or register it as the secondary provider for `HybridCache` when you want a memory-first cache with a larger local-disk tier.
+Give it a byte limit and it evicts entries to make room *before* admitting a new write; expired entries are cleaned up automatically.
+
+It is built for a **single process**, with concurrent access, configurable eviction, synchronous and asynchronous operations, and Native AOT compatibility.
+
+Use it directly when local disk is the right cache, or register it as the secondary provider for `HybridCache` when you want a memory-first cache with a larger local-disk tier.
 
 > [!IMPORTANT]
 > **Local, ephemeral, not shared.** `IDistributedCache` is the interface this package implements, not a promise of distributed storage. Each process has its own cache; entries are disposable and must be recoverable from your source of truth. Do not use this provider when replicas must share entries or cache contents must survive restarts.
@@ -111,7 +115,12 @@ Set a byte-based size limit if you want the cache to control its footprint. When
 | FIFO | First added | Simple insertion order is preferable when older data becomes less useful over time. |
 | TTL | Soonest to expire | Entries closest to expiry have the least remaining useful life. |
 
-The package supports `DistributedCacheEntryOptions`: `AbsoluteExpiration`, `AbsoluteExpirationRelativeToNow`, and `SlidingExpiration`. Expiration controls whether an entry is valid; a capacity policy chooses which entries to remove to admit new data. The two are different mechanisms.
+The package supports `DistributedCacheEntryOptions`:
+- `AbsoluteExpiration`
+- `AbsoluteExpirationRelativeToNow`
+- `SlidingExpiration`.
+
+Expiration controls whether an entry is valid; a capacity policy chooses which entries to remove to admit new data. The two are different mechanisms.
 
 For manual capacity reduction, `IFileDistributedCache.Compact(decimal percentage)` selects entries according to the configured eviction policy. For example, `Compact(0.10)` requests removal of at least 10% of existing entries. This is useful even when no size limit is configured.
 
@@ -150,31 +159,31 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 > 1s == 1000ms, 1ms == 1000us, 1us == 1000ns
 
 ### [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
-| Method           | Mean      | Error      | StdDev    | Median    |
-|----------------- |----------:|-----------:|----------:|----------:|
-| Set              | 16.940 ms |  30.690 ms |  7.970 ms | 11.880 ms |
-| SetBuffered      | 20.029 ms |  48.741 ms | 12.658 ms | 11.633 ms |
-| SetAsync         | 16.594 ms |  52.872 ms |  8.182 ms | 12.895 ms |
-| SetBufferedAsync | 38.859 ms | 129.973 ms | 33.753 ms | 20.163 ms |
-| Get              |  6.126 ms |   1.100 ms |  0.285 ms |  6.269 ms |
-| GetBuffered      |  0.082 ms |   0.025 ms |  0.003 ms |  0.082 ms |
-| GetAsync         |  6.688 ms |   1.191 ms |  0.309 ms |  6.519 ms |
-| GetBufferedAsync |  6.858 ms |   0.666 ms |  0.173 ms |  6.817 ms |
+| Method           | Mean      | StdDev    | Median    |
+|----------------- |----------:|----------:|----------:|
+| Set              | 11.266 ms |  0.153 ms | 11.282 ms |
+| SetBuffered      | 16.982 ms |  8.059 ms | 11.888 ms |
+| SetAsync         | 26.796 ms | 21.526 ms | 12.326 ms |
+| SetBufferedAsync | 12.068 ms |  0.149 ms | 12.130 ms |
+| Get              |  6.479 ms |  0.264 ms |  6.371 ms |
+| GetBuffered      |  0.088 ms |  0.006 ms |  0.087 ms |
+| GetAsync         |  7.380 ms |  0.160 ms |  7.368 ms |
+| GetBufferedAsync |  8.012 ms |  0.366 ms |  7.816 ms |
 
 > [!Note]
 > This cache is ephemeral, designed for single-process use.
 
 ### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
-| Method           | Mean       | Error       | StdDev      | Median     |
-|----------------- |-----------:|------------:|------------:|-----------:|
-| Set              | 214.290 ms | 262.8838 ms |  68.2701 ms | 245.964 ms |
-| SetBuffered      |  75.283 ms | 167.7966 ms |  25.9667 ms |  67.944 ms |
-| SetAsync         |  73.989 ms |  67.4653 ms |  17.5205 ms |  68.776 ms |
-| SetBufferedAsync | 225.224 ms | 621.0536 ms | 161.2856 ms | 162.831 ms |
-| Get              |  12.131 ms |   1.0967 ms |   0.2848 ms |  12.126 ms |
-| GetBuffered      |   1.175 ms |   0.2063 ms |   0.0319 ms |   1.165 ms |
-| GetAsync         |  20.600 ms |   3.2197 ms |   0.4983 ms |  20.599 ms |
-| GetBufferedAsync |  24.006 ms |  21.1631 ms |   3.2750 ms |  25.418 ms |
+| Method           | Mean       | StdDev     | Median     |
+|----------------- |-----------:|-----------:|-----------:|
+| Set              | 131.240 ms | 74.9640 ms | 134.931 ms |
+| SetBuffered      | 103.216 ms | 44.8429 ms | 126.566 ms |
+| SetAsync         |  86.140 ms | 48.0967 ms |  72.709 ms |
+| SetBufferedAsync |  85.709 ms | 37.0179 ms |  78.982 ms |
+| Get              |  13.961 ms |  0.9503 ms |  14.264 ms |
+| GetBuffered      |   1.114 ms |  0.0878 ms |   1.118 ms |
+| GetAsync         |  17.721 ms |  0.2950 ms |  17.718 ms |
+| GetBufferedAsync |  17.408 ms |  0.1704 ms |  17.430 ms |
 
 > [!Note]
 > This cache is designed for single-process use.
