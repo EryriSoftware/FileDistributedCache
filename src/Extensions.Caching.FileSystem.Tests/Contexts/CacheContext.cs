@@ -13,7 +13,11 @@ internal class CacheContext : IDisposable
     public IBufferDistributedCache BufferCache => field ??= Services.GetRequiredService<IBufferDistributedCache>();
     public IFileDistributedCache FileCache => field ??= Services.GetRequiredService<IFileDistributedCache>();
 
-    public CacheContext(EvictionPolicy evictionPolicy = EvictionPolicy.LRU, int? sizeLimitBytes = null, string? cacheDirectory = null) =>
+    public CacheContext(
+        EvictionPolicy evictionPolicy = EvictionPolicy.LRU,
+        int? sizeLimitBytes = null,
+        string? cacheDirectory = null,
+        TimeSpan? snapshotInterval = null) =>
        Services = new ServiceCollection()
             .AddLogging()
             .AddDistributedFileCache(d =>
@@ -21,6 +25,7 @@ internal class CacheContext : IDisposable
                 d.EvictionPolicy = evictionPolicy;
                 d.SizeLimitBytes = sizeLimitBytes;
                 d.CacheDirectory = cacheDirectory;
+                d.SnapshotInterval = snapshotInterval ?? TimeSpan.FromMinutes(5);
             })
             .AddSingleton<TimeProvider>(TimeProvider)
             .BuildServiceProvider();

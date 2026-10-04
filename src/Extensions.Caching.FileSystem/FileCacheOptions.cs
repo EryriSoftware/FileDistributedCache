@@ -71,8 +71,8 @@ public record FileCacheOptions
     public string? CacheDirectory { get; set; }
 
     /// <summary>
-    /// Gets or sets the manifest snapshot interval.
-    /// A write ahead log is used to ensure minimal data loss. The snapshot speeds up recovery time.
+    /// Gets or sets the interval between compacting the Write Ahead Log into a snapshot.
+    /// A WAL is used to ensure minimal data loss. The snapshot speeds up recovery time.
     /// </summary>
     public TimeSpan SnapshotInterval { get; set; } = TimeSpan.FromMinutes(5);
 }

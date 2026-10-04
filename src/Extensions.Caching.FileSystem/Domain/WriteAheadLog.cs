@@ -5,6 +5,7 @@ namespace Eryri.Extensions.Caching.FileSystem.Domain;
 
 internal abstract class WriteAheadLog : IDisposable
 {
+    private bool hasChanges = false;
     private const int BufferSize = 64 << 10; // 64 KB
     private readonly string directory;
     private string LogPath => Path.Combine(directory, $"state.wal");
@@ -59,6 +60,7 @@ internal abstract class WriteAheadLog : IDisposable
     {
         if (command is LogCommand log)
         {
+            Interlocked.Exchange(ref hasChanges, true);
             using var buffer = MemoryPool<byte>.Shared.Rent(4);
             var header = buffer.Memory.Slice(0, 4).Span;
             BinaryPrimitives.WriteInt32LittleEndian(header, log.Value.Length);
@@ -72,25 +74,29 @@ internal abstract class WriteAheadLog : IDisposable
         }
         else if (command is SaveCommand save)
         {
-            var tempPath = SnapshotPath + ".tmp";
-
-            await using (var stream = new FileStream(
-                tempPath,
-                FileMode.Create,
-                FileAccess.Write,
-                FileShare.None,
-                bufferSize: BufferSize,
-                options: FileOptions.Asynchronous |
-                         FileOptions.SequentialScan))
+            if (Interlocked.CompareExchange(ref hasChanges, false, true))
             {
-                await WriteSnapshotAsync(
-                    stream,
-                    cancellationToken);
+                var tempPath = SnapshotPath + ".tmp";
+
+                await using (var stream = new FileStream(
+                    tempPath,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None,
+                    bufferSize: BufferSize,
+                    options: FileOptions.Asynchronous |
+                             FileOptions.SequentialScan))
+                {
+                    await WriteSnapshotAsync(
+                        stream,
+                        cancellationToken);
+                }
+
+                File.Move(tempPath, SnapshotPath, overwrite: true);
+                logStream.Seek(0, SeekOrigin.Begin);
+                logStream.SetLength(0);
             }
 
-            File.Move(tempPath, SnapshotPath, overwrite: true);
-            logStream.Seek(0, SeekOrigin.Begin);
-            logStream.SetLength(0);
             save.TaskSource.SetResult();
         }
     }

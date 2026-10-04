@@ -1,4 +1,6 @@
-﻿using System.Text.Json;
+﻿using System.Buffers;
+using System.Text.Json;
+using Eryri.Extensions.Caching.FileSystem.Extensions;
 using Eryri.Extensions.Caching.FileSystem.Models;
 using Microsoft.Extensions.Options;
 
@@ -8,6 +10,7 @@ internal class ManifestPersistance : WriteAheadLog
 {
     private readonly Manifest manifest;
     private readonly CacheDirectoryOwner directoryOwner;
+    private readonly FileCacheOptions options;
 
     public ManifestPersistance(
         Manifest manifest,
@@ -17,6 +20,7 @@ internal class ManifestPersistance : WriteAheadLog
     {
         this.manifest = manifest;
         this.directoryOwner = directoryOwner;
+        this.options = options.Value;
         timeProvider.CreateTimer(_ => _ = SaveSnapshotAsync(), null, options.Value.SnapshotInterval, options.Value.SnapshotInterval);
     }
 
@@ -29,20 +33,26 @@ internal class ManifestPersistance : WriteAheadLog
 
     private async ValueTask Append(Metadata value, MutationType type, CancellationToken cancellationToken)
     {
-        var log = new Mutation(type, value);
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(log, Mutation.TypeInfo);
-        await AppendAsync(bytes, cancellationToken);
+        var mutation = new Mutation(type, value);
+        var writer = new ArrayBufferWriter<byte>();
+        writer.Write(mutation);
+        await AppendAsync(writer.WrittenSpan.ToArray(), cancellationToken);
+
+        if (options.SnapshotInterval <= TimeSpan.Zero)
+        {
+            _ = SaveSnapshotAsync(cancellationToken);
+        }
     }
 
     protected override ValueTask ApplyAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
     {
-        var mutation = JsonSerializer.Deserialize(data.Span, Mutation.TypeInfo)!;
+        data.Span.ReadMutation(out var mutation);
 
-        if (mutation.Kind == MutationType.Insert)
+        if (mutation.Type == MutationType.Insert)
         {
             manifest.AddOrReplace(mutation.Value, out _);
         }
-        else if (mutation.Kind == MutationType.Update)
+        else if (mutation.Type == MutationType.Update)
         {
             while (manifest.TryGetValue(mutation.Value.Key, out var existing)
                 && mutation.Value.Version > existing.Version)
@@ -53,7 +63,7 @@ internal class ManifestPersistance : WriteAheadLog
                 }
             }
         }
-        else if (mutation.Kind == MutationType.Delete)
+        else if (mutation.Type == MutationType.Delete)
         {
             manifest.TryRemove(mutation.Value);
         }
@@ -63,12 +73,7 @@ internal class ManifestPersistance : WriteAheadLog
 
     protected override async ValueTask ReadSnapshotAsync(FileStream stream, CancellationToken cancellationToken)
     {
-        var values = await JsonSerializer.DeserializeAsync(
-            stream,
-            JsonContext.Default.ICollectionMetadata,
-            cancellationToken);
-
-        foreach (var item in values!)
+        await foreach (var item in stream.ReadMetadataValues(cancellationToken))
         {
             manifest.TryAdd(item);
         }
@@ -76,11 +81,7 @@ internal class ManifestPersistance : WriteAheadLog
 
     protected override async ValueTask WriteSnapshotAsync(Stream stream, CancellationToken cancellationToken)
     {
-        await JsonSerializer.SerializeAsync(
-            stream,
-            manifest.Values,
-            JsonContext.Default.ICollectionMetadata,
-            cancellationToken);
+        await stream.Write(manifest.Values, cancellationToken);
     }
 
     public override async ValueTask RestoreSnapshotAsync(CancellationToken cancellationToken)

@@ -101,12 +101,12 @@ internal class ReadWriteTests
     }
 
     [Test]
-    public void Is_Persistant()
+    public void Is_Persistant_With_WAL()
     {
         // Arrange
-        var key = Guid.NewGuid().ToString("N") + ForbiddenFilenameCharacters;
+        var keys = Enumerable.Range(0, 1000).Select(d => Guid.NewGuid().ToString("N")).ToArray();
         var directory = Directory.CreateTempSubdirectory();
-        var payload = RandomNumberGenerator.GetBytes(4 << 10); // 4 KiB
+        var payload = RandomNumberGenerator.GetBytes(10);
 
         try
         {
@@ -117,24 +117,73 @@ internal class ReadWriteTests
                     AbsoluteExpiration = ctx.Now.AddDays(1)
                 };
 
-                // Act
-                ctx.Cache.Set(key, payload, options);
-                var actual = ctx.Cache.Get(key);
+                Parallel.ForEach(keys, key =>
+                {
+                    // Act
+                    ctx.Cache.Set(key, payload, options);
+                    var actual = ctx.Cache.Get(key);
 
-                // Assert
-                actual.Should().BeEquivalentTo(payload);
+                    // Assert
+                    actual.Should().BeEquivalentTo(payload);
+                });
             }
 
-            for (int i = 0; i < 10; i++)
+            using (var ctx = new CacheContext(cacheDirectory: directory.FullName))
             {
-                using (var ctx = new CacheContext(cacheDirectory: directory.FullName))
+                Parallel.ForEach(keys, key =>
                 {
                     // Act
                     var actual = ctx.Cache.Get(key);
 
                     // Assert
                     actual.Should().BeEquivalentTo(payload);
-                }
+                });
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory.FullName, recursive: true);
+        }
+    }
+
+    [Test]
+    public void Is_Persistant_With_Snapshot()
+    {
+        // Arrange
+        var keys = Enumerable.Range(0, 10).Select(d => Guid.NewGuid().ToString("N")).ToArray();
+        var directory = Directory.CreateTempSubdirectory();
+        var payload = RandomNumberGenerator.GetBytes(10);
+
+        try
+        {
+            using (var ctx = new CacheContext(cacheDirectory: directory.FullName, snapshotInterval: TimeSpan.Zero))
+            {
+                var options = new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpiration = ctx.Now.AddDays(1)
+                };
+
+                Parallel.ForEach(keys, key =>
+                {
+                    // Act
+                    ctx.Cache.Set(key, payload, options);
+                    var actual = ctx.Cache.Get(key);
+
+                    // Assert
+                    actual.Should().BeEquivalentTo(payload);
+                });
+            }
+
+            using (var ctx = new CacheContext(cacheDirectory: directory.FullName))
+            {
+                Parallel.ForEach(keys, key =>
+                {
+                    // Act
+                    var actual = ctx.Cache.Get(key);
+
+                    // Assert
+                    actual.Should().BeEquivalentTo(payload);
+                });
             }
         }
         finally

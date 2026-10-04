@@ -1,6 +1,6 @@
 ﻿namespace Eryri.Extensions.Caching.FileSystem.Models;
 
-internal enum MutationType
+internal enum MutationType : byte
 {
     Insert,
     Update,
