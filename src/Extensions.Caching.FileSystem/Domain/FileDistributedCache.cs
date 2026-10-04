@@ -13,7 +13,8 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 {
     public FileDistributedCache(
         TimeProvider timeProvider,
-        FileCacheManifest manifest,
+        Manifest manifest,
+        ManifestPersistance persistance,
         CacheDirectoryOwner directoryOwner,
         IOptions<FileCacheOptions> optionsAccessor,
         ILogger<FileDistributedCache>? logger = null)
@@ -24,7 +25,11 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         this.logger = logger;
         cleanupTimer = timeProvider.CreateTimer(_ => RemoveExpired(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         this.manifest = manifest;
+        this.persistance = persistance;
         cacheDirectory = directoryOwner.Directory;
+
+        persistance.RestoreSnapshotAsync(CancellationToken.None).GetAwaiter().GetResult();
+        RemoveExpired();
     }
 
     private readonly ConcurrentDictionary<string, Lazy<DirectoryInfo>> directories = new (StringComparer.OrdinalIgnoreCase);
@@ -34,7 +39,8 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     private readonly long minScanFrequencyTicks;
     private readonly TimeProvider timeProvider;
     private readonly DirectoryInfo cacheDirectory;
-    private readonly FileCacheManifest manifest;
+    private readonly Manifest manifest;
+    private readonly ManifestPersistance persistance;
     private long nextCleanup = DateTimeOffset.MaxValue.UtcTicks;
     private readonly ITimer cleanupTimer;
 
@@ -213,13 +219,14 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
             if (manifest.TryUpdate(key, newEntry, entry))
             {
+                persistance.Update(newEntry, CancellationToken.None).GetAwaiter().GetResult();
                 QueueCleanup(newEntry.ExpirationTicks);
                 return;
             }
         }
     }
 
-    private bool RemoveIfExpired(FileCacheMetadata entry) =>
+    private bool RemoveIfExpired(Metadata entry) =>
         entry.ExpirationTicks is { } expiry && expiry < timeProvider.GetUtcNow().UtcTicks && Remove(entry);
 
     public Task RefreshAsync(string key, CancellationToken cancellationToken)
@@ -232,6 +239,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         if (manifest.TryRemove(key, out var entry))
         {
+            persistance.Delete(entry, CancellationToken.None).GetAwaiter().GetResult();
             TryDelete(entry.Path);
         }
     }
@@ -242,10 +250,11 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         return Task.CompletedTask;
     }
 
-    private bool Remove(FileCacheMetadata entry)
+    private bool Remove(Metadata entry)
     {
-        if (manifest.TryRemove(new KeyValuePair<string, FileCacheMetadata>(entry.Key, entry)))
+        if (manifest.TryRemove(entry))
         {
+            persistance.Delete(entry, CancellationToken.None).GetAwaiter().GetResult();
             TryDelete(entry.Path);
             return true;
         }
@@ -281,7 +290,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         return 10;
     }
 
-    private FileCacheMetadata CreateFileEntry(string key, long payloadSize, DistributedCacheEntryOptions options)
+    private Metadata CreateFileEntry(string key, long payloadSize, DistributedCacheEntryOptions options)
     {
         var id = Guid.NewGuid().ToString("N");
         var shard = id[..ShardingDepth()];
@@ -290,7 +299,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         var directory = directories
             .GetOrAdd(shard, static (shard, root) => new Lazy<DirectoryInfo>(() => Directory.CreateDirectory(Path.Combine(root.FullName, shard))), cacheDirectory)
             .Value; // Ensure the directory is created before writing the file
-        return new FileCacheMetadata(
+        return new Metadata(
             Key: key,
             Path: path,
             SizeBytes: payloadSize,
@@ -308,23 +317,15 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         };
     }
 
-    private void PublishEntry(FileCacheMetadata entry)
+    private void PublishEntry(Metadata entry)
     {
-        while (true)
+        if (manifest.AddOrReplace(entry, out var existing))
         {
-            if (manifest.TryGetValue(entry.Key, out var existing)
-                && manifest.TryUpdate(entry.Key, entry, existing))
-            {
-                TryDelete(existing.Path);
-                QueueCleanup(entry.ExpirationTicks);
-                return;
-            }
-            else if (manifest.TryAdd(entry.Key, entry))
-            {
-                QueueCleanup(entry.ExpirationTicks);
-                return;
-            }
+            TryDelete(existing.Path);
         }
+
+        persistance.Insert(entry, CancellationToken.None).GetAwaiter().GetResult();
+        QueueCleanup(entry.ExpirationTicks);
     }
 
     private void QueueCleanup(long? dueTimeTicks)

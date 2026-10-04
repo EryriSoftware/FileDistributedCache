@@ -99,4 +99,47 @@ internal class ReadWriteTests
         // Assert
         actual.Should().BeEquivalentTo(payload);
     }
+
+    [Test]
+    public void Is_Persistant()
+    {
+        // Arrange
+        var key = Guid.NewGuid().ToString("N") + ForbiddenFilenameCharacters;
+        var directory = Directory.CreateTempSubdirectory();
+        var payload = RandomNumberGenerator.GetBytes(4 << 10); // 4 KiB
+
+        try
+        {
+            using (var ctx = new CacheContext(cacheDirectory: directory.FullName))
+            {
+                var options = new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpiration = ctx.Now.AddDays(1)
+                };
+
+                // Act
+                ctx.Cache.Set(key, payload, options);
+                var actual = ctx.Cache.Get(key);
+
+                // Assert
+                actual.Should().BeEquivalentTo(payload);
+            }
+
+            for (int i = 0; i < 10; i++)
+            {
+                using (var ctx = new CacheContext(cacheDirectory: directory.FullName))
+                {
+                    // Act
+                    var actual = ctx.Cache.Get(key);
+
+                    // Assert
+                    actual.Should().BeEquivalentTo(payload);
+                }
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory.FullName, recursive: true);
+        }
+    }
 }

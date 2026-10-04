@@ -22,7 +22,8 @@ public static class ServiceCollectionExtensions
             services.TryAddSingleton(TimeProvider.System);
             services.AddOptionsWithValidateOnStart<FileCacheOptions>(nameof(FileCacheOptions));
             services.TryAddSingleton<CacheDirectoryOwner>();
-            services.TryAddSingleton<FileCacheManifest>();
+            services.TryAddSingleton<Manifest>();
+            services.TryAddSingleton<ManifestPersistance>();
             services.TryAddSingleton<FileDistributedCache>();
             services.TryAddSingleton<IFileDistributedCache>(sp => sp.GetRequiredService<FileDistributedCache>());
             services.TryAddSingleton<IDistributedCache>(sp => sp.GetRequiredService<FileDistributedCache>());
