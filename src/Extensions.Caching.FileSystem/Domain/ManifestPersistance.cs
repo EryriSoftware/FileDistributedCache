@@ -1,10 +1,25 @@
 ﻿using System.Text.Json;
 using Eryri.Extensions.Caching.FileSystem.Models;
+using Microsoft.Extensions.Options;
 
 namespace Eryri.Extensions.Caching.FileSystem.Domain;
 
-internal class ManifestPersistance(Manifest manifest, CacheDirectoryOwner directoryOwner) : WriteAheadLog(directoryOwner.Directory.FullName)
+internal class ManifestPersistance : WriteAheadLog
 {
+    private readonly Manifest manifest;
+    private readonly CacheDirectoryOwner directoryOwner;
+
+    public ManifestPersistance(
+        Manifest manifest,
+        CacheDirectoryOwner directoryOwner,
+        IOptions<FileCacheOptions> options,
+        TimeProvider timeProvider) : base(directoryOwner.Directory.FullName)
+    {
+        this.manifest = manifest;
+        this.directoryOwner = directoryOwner;
+        timeProvider.CreateTimer(_ => _ = SaveSnapshotAsync(), null, options.Value.SnapshotInterval, options.Value.SnapshotInterval);
+    }
+
     public ValueTask Insert(Metadata value, CancellationToken cancellationToken) =>
         Append(value, MutationType.Insert, cancellationToken);
     public ValueTask Update(Metadata value, CancellationToken cancellationToken) =>

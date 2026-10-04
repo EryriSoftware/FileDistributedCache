@@ -69,4 +69,10 @@ public record FileCacheOptions
     /// Defaults to a tmp directoryy that's deletet when the application shuts down.
     /// </summary>
     public string? CacheDirectory { get; set; }
+
+    /// <summary>
+    /// Gets or sets the manifest snapshot interval.
+    /// A write ahead log is used to ensure minimal data loss. The snapshot speeds up recovery time.
+    /// </summary>
+    public TimeSpan SnapshotInterval { get; set; } = TimeSpan.FromMinutes(5);
 }
