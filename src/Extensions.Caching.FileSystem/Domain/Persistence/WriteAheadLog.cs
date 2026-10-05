@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.Threading.Channels;
 using Eryri.Extensions.Caching.FileSystem.Extensions;
 
-namespace Eryri.Extensions.Caching.FileSystem.Domain;
+namespace Eryri.Extensions.Caching.FileSystem.Domain.Persistence;
 
 internal abstract class WriteAheadLog : IDisposable, IAsyncDisposable
 {

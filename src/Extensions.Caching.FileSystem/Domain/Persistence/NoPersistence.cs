@@ -1,6 +1,6 @@
 ﻿using Eryri.Extensions.Caching.FileSystem.Models;
 
-namespace Eryri.Extensions.Caching.FileSystem.Domain;
+namespace Eryri.Extensions.Caching.FileSystem.Domain.Persistence;
 
 internal class NoPersistence : IPersistence
 {

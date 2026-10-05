@@ -3,7 +3,7 @@ using Eryri.Extensions.Caching.FileSystem.Extensions;
 using Eryri.Extensions.Caching.FileSystem.Models;
 using Microsoft.Extensions.Options;
 
-namespace Eryri.Extensions.Caching.FileSystem.Domain;
+namespace Eryri.Extensions.Caching.FileSystem.Domain.Persistence;
 
 internal class WalPersistence : WriteAheadLog, IPersistence
 {

@@ -1,6 +1,7 @@
 ﻿using System.Buffers;
 using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
+using Eryri.Extensions.Caching.FileSystem.Domain.Persistence;
 using Eryri.Extensions.Caching.FileSystem.Extensions;
 using Eryri.Extensions.Caching.FileSystem.Models;
 using Microsoft.Extensions.Caching.Distributed;
