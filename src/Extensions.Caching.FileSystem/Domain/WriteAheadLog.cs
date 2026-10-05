@@ -4,7 +4,7 @@ using Eryri.Extensions.Caching.FileSystem.Extensions;
 
 namespace Eryri.Extensions.Caching.FileSystem.Domain;
 
-internal abstract class WriteAheadLog : IAsyncDisposable
+internal abstract class WriteAheadLog : IDisposable, IAsyncDisposable
 {
     protected bool IsDisposed { get; private set; }
     private bool hasChanges = false;
@@ -180,6 +180,8 @@ internal abstract class WriteAheadLog : IAsyncDisposable
             sync.Dispose();
         }
     }
+
+    public void Dispose() => DisposeAsync().GetAwaiter().GetResult();
 
     private interface ICommand { }
     private record LogCommand(ReadOnlyMemory<byte> Value) : ICommand;

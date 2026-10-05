@@ -30,5 +30,5 @@ internal class CacheContext : IDisposable
 
     public void Advance(TimeSpan ts) => TimeProvider.Advance(ts);
 
-    public void Dispose() => Services.DisposeAsync().GetAwaiter().GetResult();
+    public void Dispose() => Services.Dispose();
 }
