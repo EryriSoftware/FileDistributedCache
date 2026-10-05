@@ -1,4 +1,5 @@
 ﻿using System.Buffers;
+using System.Buffers.Binary;
 using System.Threading.Channels;
 using Eryri.Extensions.Caching.FileSystem.Extensions;
 
@@ -6,12 +7,14 @@ namespace Eryri.Extensions.Caching.FileSystem.Domain;
 
 internal abstract class WriteAheadLog : IDisposable, IAsyncDisposable
 {
+    protected abstract ulong FormatVersion { get; }
     protected bool IsDisposed { get; private set; }
     private bool hasChanges = false;
     private const int BufferSize = 64 << 10; // 64 KB
     private readonly string directory;
-    private string LogPath => Path.Combine(directory, $"state.wal");
+    private string LogPath => Path.Combine(directory, "state.wal");
     private string SnapshotPath => Path.Combine(directory, "snapshot.wal");
+    private string VersionPath => Path.Combine(directory, "version.wal");
     private readonly FileStream logStream;
     private readonly SemaphoreSlim sync = new (1, 1);
     private readonly CancellationTokenSource ctSource = new CancellationTokenSource();
@@ -28,6 +31,7 @@ internal abstract class WriteAheadLog : IDisposable, IAsyncDisposable
     {
         this.directory = directory;
         Directory.CreateDirectory(directory);
+        CheckVersion();
 
         logStream = new FileStream(
             LogPath,
@@ -39,6 +43,38 @@ internal abstract class WriteAheadLog : IDisposable, IAsyncDisposable
 
         logStream.Seek(0, SeekOrigin.End);
         _ = ConsumerLoop(ctSource.Token);
+    }
+
+    private void CheckVersion()
+    {
+        Span<byte> buffer = stackalloc byte[sizeof(long)];
+        if (File.Exists(VersionPath))
+        {
+            using var fs = File.OpenRead(VersionPath);
+
+            if (fs.Length != 8)
+            {
+                CleanCache();
+            }
+            else
+            {
+                fs.ReadExactly(buffer);
+                var currentVersion = BinaryPrimitives.ReadUInt64LittleEndian(buffer);
+                if (currentVersion != FormatVersion)
+                {
+                    CleanCache();
+                }
+            }
+        }
+
+        BinaryPrimitives.WriteUInt64LittleEndian(buffer, FormatVersion);
+        File.WriteAllBytes(VersionPath, buffer);
+
+        void CleanCache()
+        {
+            Directory.Delete(directory, recursive: true);
+            Directory.CreateDirectory(directory);
+        }
     }
 
     private async Task ConsumerLoop(CancellationToken cancellationToken)

@@ -9,7 +9,7 @@ internal class ManifestPersistance : WriteAheadLog
 {
     private readonly Manifest manifest;
     private readonly CacheDirectoryOwner directoryOwner;
-    private readonly FileCacheOptions options;
+    protected override ulong FormatVersion { get; } = 1;
 
     private ITimer snapshotSchedule;
 
@@ -21,7 +21,6 @@ internal class ManifestPersistance : WriteAheadLog
     {
         this.manifest = manifest;
         this.directoryOwner = directoryOwner;
-        this.options = options.Value;
         snapshotSchedule = timeProvider.CreateTimer(_ => SaveSnapshotAsync().GetAwaiter().GetResult(), null, options.Value.SnapshotInterval, options.Value.SnapshotInterval);
     }
 
