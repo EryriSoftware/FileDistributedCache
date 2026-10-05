@@ -1,6 +1,7 @@
 ﻿using System.Buffers;
 using Eryri.Extensions.Caching.FileSystem.Extensions;
 using Eryri.Extensions.Caching.FileSystem.Models;
+using Eryri.Extensions.Caching.FileSystem.Wal;
 using Microsoft.Extensions.Options;
 
 namespace Eryri.Extensions.Caching.FileSystem.Domain.Persistence;

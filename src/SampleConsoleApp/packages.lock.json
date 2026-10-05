@@ -68,7 +68,8 @@
         "dependencies": {
           "Microsoft.Extensions.Caching.Abstractions": "[10.0.0, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.0, )",
-          "Microsoft.Extensions.Options": "[10.0.0, )"
+          "Microsoft.Extensions.Options": "[10.0.0, )",
+          "System.IO.Hashing": "[10.0.0, )"
         }
       },
       "Microsoft.Extensions.Caching.Abstractions": {
@@ -98,6 +99,12 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.12",
           "Microsoft.Extensions.Primitives": "10.0.12"
         }
+      },
+      "System.IO.Hashing": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.0, )",
+        "resolved": "10.0.0",
+        "contentHash": "MqSp5IfX9RdWVwTED0WSRL1kZDNB7GlFj64O/NAJs4uO1beBHWEAFLlC7j8Fw/PkI+SUzooLVNvAe4aEkSwsRg=="
       }
     },
     "net10.0/win-x64": {

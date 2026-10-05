@@ -5,7 +5,7 @@ using BenchmarkDotNet.Running;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Eryri.Extensions.Caching.FileSystem.Tests.Benchmark;
+namespace Eryri.Extensions.Caching.FileSystem.Tests.Performance;
 
 [TestFixture]
 public class BenchmarkTests

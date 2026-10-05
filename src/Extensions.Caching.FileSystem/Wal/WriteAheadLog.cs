@@ -1,14 +1,16 @@
 ﻿using System.Buffers;
 using System.Buffers.Binary;
+using System.IO.Hashing;
 using System.Threading.Channels;
 using Eryri.Extensions.Caching.FileSystem.Extensions;
 
-namespace Eryri.Extensions.Caching.FileSystem.Domain.Persistence;
+namespace Eryri.Extensions.Caching.FileSystem.Wal;
 
-internal abstract class WriteAheadLog<T> : IDisposable, IAsyncDisposable
+internal abstract class WriteAheadLog<T> : IWriteAheadLog<T>, IDisposable, IAsyncDisposable
 {
     protected abstract ulong FormatVersion { get; }
     protected bool IsDisposed { get; private set; }
+    private bool initialized;
     private bool hasChanges = false;
     private const int BufferSize = 64 << 10; // 64 KB
     private readonly string directory;
@@ -18,7 +20,7 @@ internal abstract class WriteAheadLog<T> : IDisposable, IAsyncDisposable
     private readonly FileStream logStream;
     private readonly SemaphoreSlim sync = new (1, 1);
     private readonly CancellationTokenSource ctSource = new CancellationTokenSource();
-    private readonly Task consumer;
+    private Task? consumer;
     private ArrayBufferWriter<byte> buffer = new ArrayBufferWriter<byte>(BufferSize);
     private readonly Channel<Command> channel = Channel
         .CreateUnbounded<Command>(
@@ -44,7 +46,6 @@ internal abstract class WriteAheadLog<T> : IDisposable, IAsyncDisposable
             options: FileOptions.Asynchronous);
 
         logStream.Seek(0, SeekOrigin.End);
-        consumer = ConsumerLoop(ctSource.Token);
     }
 
     private void CheckVersion()
@@ -122,9 +123,16 @@ internal abstract class WriteAheadLog<T> : IDisposable, IAsyncDisposable
         if (command is AppendCommand log)
         {
             Interlocked.Exchange(ref hasChanges, true);
+
             Serialize(log.Value, buffer);
             logStream.Write(buffer.WrittenCount);
+
+            var checksum = Crc32.HashToUInt32(buffer.WrittenSpan);
+            BinaryPrimitives.WriteUInt32LittleEndian(buffer.GetSpan(4), checksum);
+            buffer.Advance(4);
+
             await logStream.WriteAsync(buffer.WrittenMemory, cancellationToken);
+
             ResetBuffer();
 
             if (log.durability == Durability.Flush)
@@ -134,7 +142,7 @@ internal abstract class WriteAheadLog<T> : IDisposable, IAsyncDisposable
         }
         else if (command is FlushCommand flush)
         {
-            await logStream.FlushAsync();
+            await logStream.FlushAsync(cancellationToken);
         }
         else if (command is SaveCommand save)
         {
@@ -165,6 +173,72 @@ internal abstract class WriteAheadLog<T> : IDisposable, IAsyncDisposable
         command.Complete();
     }
 
+    public virtual async ValueTask InitializeAsync(CancellationToken cancellationToken)
+    {
+        await sync.WaitAsync(cancellationToken);
+
+        try
+        {
+            if (initialized)
+            {
+                return;
+            }
+
+            if (File.Exists(SnapshotPath))
+            {
+                await using var stream = new FileStream(
+                SnapshotPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: BufferSize,
+                options: FileOptions.Asynchronous | FileOptions.SequentialScan);
+
+                await ReadSnapshotAsync(stream, cancellationToken);
+            }
+
+            logStream.Seek(0, SeekOrigin.Begin);
+
+            while (logStream.Position + 4 <= logStream.Length)
+            {
+                var recordStart = logStream.Position;
+                var length = logStream.ReadInt();
+
+                if (logStream.Position + 4 + length <= logStream.Length)
+                {
+                    var memory = buffer.GetMemory(length + 4).Slice(0, length + 4);
+                    await logStream.ReadExactlyAsync(memory, cancellationToken);
+                    var payload = memory.Slice(0, length);
+                    var checksum = Crc32.HashToUInt32(payload.Span);
+                    var actualChecksum = BinaryPrimitives.ReadUInt32LittleEndian(memory.Span.Slice(length));
+
+                    if (checksum != actualChecksum)
+                    {
+                        logStream.SetLength(recordStart);
+                        break;
+                    }
+
+                    var record = Deserialize(payload);
+                    await ApplyAsync(record, cancellationToken);
+                    ResetBuffer();
+                }
+                else
+                {
+                    logStream.SetLength(recordStart);
+                    break;
+                }
+            }
+
+            consumer = ConsumerLoop(ctSource.Token);
+            initialized = true;
+        }
+        finally
+        {
+            logStream.Seek(0, SeekOrigin.End);
+            sync.Release();
+        }
+    }
+
     public ValueTask AppendAsync(T record, CancellationToken cancellationToken) => AppendAsync(record, Durability.None, cancellationToken);
     public async ValueTask AppendAsync(T record, Durability durability, CancellationToken cancellationToken)
     {
@@ -190,45 +264,6 @@ internal abstract class WriteAheadLog<T> : IDisposable, IAsyncDisposable
         await command.Task.WaitAsync(cancellationToken);
     }
 
-    public virtual async ValueTask InitializeAsync(CancellationToken cancellationToken)
-    {
-        await sync.WaitAsync(cancellationToken);
-
-        try
-        {
-            if (File.Exists(SnapshotPath))
-            {
-                await using var stream = new FileStream(
-                SnapshotPath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                bufferSize: BufferSize,
-                options: FileOptions.Asynchronous | FileOptions.SequentialScan);
-
-                await ReadSnapshotAsync(stream, cancellationToken);
-            }
-
-            logStream.Seek(0, SeekOrigin.Begin);
-
-            while (logStream.Position < logStream.Length)
-            {
-                var length = logStream.ReadInt();
-                var memory = buffer.GetMemory(length).Slice(0, length);
-                await logStream.ReadExactlyAsync(memory, cancellationToken);
-
-                var record = Deserialize(memory);
-                await ApplyAsync(record, cancellationToken);
-                ResetBuffer();
-            }
-        }
-        finally
-        {
-            logStream.Seek(0, SeekOrigin.End);
-            sync.Release();
-        }
-    }
-
     public async Task FlushAsync(CancellationToken cancellationToken)
     {
         var command = new FlushCommand();
@@ -241,7 +276,14 @@ internal abstract class WriteAheadLog<T> : IDisposable, IAsyncDisposable
         if (!IsDisposed)
         {
             IsDisposed = true;
-            await FlushAsync(ctSource.Token);
+
+            if (initialized)
+            {
+                await FlushAsync(ctSource.Token);
+                channel.Writer.TryComplete();
+                await consumer!;
+            }
+
             ctSource.Cancel();
             ctSource.Dispose();
             logStream.Dispose();
@@ -250,18 +292,6 @@ internal abstract class WriteAheadLog<T> : IDisposable, IAsyncDisposable
     }
 
     public void Dispose() => DisposeAsync().GetAwaiter().GetResult();
-
-    public enum Durability
-    {
-        /// <summary>Queue the record without waiting for persistence.</summary>
-        None,
-
-        /// <summary>Wait until the record has been written to the stream.</summary>
-        Write,
-
-        /// <summary>Wait until the record has been flushed.</summary>
-        Flush
-    }
 
     private abstract record class Command
     {
