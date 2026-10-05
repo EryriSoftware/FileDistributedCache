@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using Eryri.Extensions.Caching.FileSystem;
 using Microsoft.Extensions.Caching.Distributed;
 
 namespace Eryri.Extensions.Caching.FileSystem;

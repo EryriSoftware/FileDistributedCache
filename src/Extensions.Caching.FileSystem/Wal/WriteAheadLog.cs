@@ -5,7 +5,7 @@ using Eryri.Extensions.Caching.FileSystem.Extensions;
 
 namespace Eryri.Extensions.Caching.FileSystem.Domain.Persistence;
 
-internal abstract class WriteAheadLog : IDisposable, IAsyncDisposable
+internal abstract class WriteAheadLog<T> : IDisposable, IAsyncDisposable
 {
     protected abstract ulong FormatVersion { get; }
     protected bool IsDisposed { get; private set; }
@@ -13,13 +13,15 @@ internal abstract class WriteAheadLog : IDisposable, IAsyncDisposable
     private const int BufferSize = 64 << 10; // 64 KB
     private readonly string directory;
     private string LogPath => Path.Combine(directory, "state.wal");
-    private string SnapshotPath => Path.Combine(directory, "snapshot.wal");
-    private string VersionPath => Path.Combine(directory, "version.wal");
+    private string SnapshotPath => Path.Combine(directory, "snapshot.bin");
+    private string VersionPath => Path.Combine(directory, "format.version");
     private readonly FileStream logStream;
     private readonly SemaphoreSlim sync = new (1, 1);
     private readonly CancellationTokenSource ctSource = new CancellationTokenSource();
-    private readonly Channel<ICommand> channel = Channel
-        .CreateUnbounded<ICommand>(
+    private readonly Task consumer;
+    private ArrayBufferWriter<byte> buffer = new ArrayBufferWriter<byte>(BufferSize);
+    private readonly Channel<Command> channel = Channel
+        .CreateUnbounded<Command>(
     new UnboundedChannelOptions
     {
         SingleReader = true,
@@ -42,7 +44,7 @@ internal abstract class WriteAheadLog : IDisposable, IAsyncDisposable
             options: FileOptions.Asynchronous);
 
         logStream.Seek(0, SeekOrigin.End);
-        _ = ConsumerLoop(ctSource.Token);
+        consumer = ConsumerLoop(ctSource.Token);
     }
 
     private void CheckVersion()
@@ -72,8 +74,17 @@ internal abstract class WriteAheadLog : IDisposable, IAsyncDisposable
 
         void CleanCache()
         {
-            Directory.Delete(directory, recursive: true);
-            Directory.CreateDirectory(directory);
+            Delete(LogPath);
+            Delete(SnapshotPath);
+            Delete(VersionPath);
+        }
+
+        void Delete(string path)
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
         }
     }
 
@@ -94,18 +105,36 @@ internal abstract class WriteAheadLog : IDisposable, IAsyncDisposable
         }
     }
 
-    private async ValueTask HandleCommand(ICommand command, CancellationToken cancellationToken)
+    private void ResetBuffer()
     {
-        if (command is LogCommand log)
+        if (buffer.Capacity > BufferSize)
+        {
+            buffer = new ArrayBufferWriter<byte>(BufferSize);
+        }
+        else
+        {
+            buffer.ResetWrittenCount();
+        }
+    }
+
+    private async ValueTask HandleCommand(Command command, CancellationToken cancellationToken)
+    {
+        if (command is AppendCommand log)
         {
             Interlocked.Exchange(ref hasChanges, true);
-            logStream.Write(log.Value.Length);
-            await logStream.WriteAsync(log.Value, cancellationToken);
+            Serialize(log.Value, buffer);
+            logStream.Write(buffer.WrittenCount);
+            await logStream.WriteAsync(buffer.WrittenMemory, cancellationToken);
+            ResetBuffer();
+
+            if (log.durability == Durability.Flush)
+            {
+                await logStream.FlushAsync(cancellationToken);
+            }
         }
         else if (command is FlushCommand flush)
         {
             await logStream.FlushAsync();
-            flush.TaskSource.SetResult();
         }
         else if (command is SaveCommand save)
         {
@@ -131,34 +160,37 @@ internal abstract class WriteAheadLog : IDisposable, IAsyncDisposable
                 logStream.Seek(0, SeekOrigin.Begin);
                 logStream.SetLength(0);
             }
+        }
 
-            save.TaskSource.SetResult();
+        command.Complete();
+    }
+
+    public ValueTask AppendAsync(T record, CancellationToken cancellationToken) => AppendAsync(record, Durability.None, cancellationToken);
+    public async ValueTask AppendAsync(T record, Durability durability, CancellationToken cancellationToken)
+    {
+        var command = new AppendCommand(record, durability);
+        await channel.Writer.WriteAsync(command, cancellationToken);
+
+        if (durability != Durability.None)
+        {
+            await command.Task.WaitAsync(cancellationToken);
         }
     }
 
-    public async ValueTask AppendAsync(
-        ReadOnlyMemory<byte> data,
-        CancellationToken cancellationToken = default)
+    protected abstract void Serialize(T record, IBufferWriter<byte> buffer);
+    protected abstract T Deserialize(ReadOnlyMemory<byte> record);
+    protected abstract ValueTask ApplyAsync(T record, CancellationToken cancellationToken);
+    protected abstract ValueTask WriteSnapshotAsync(Stream stream, CancellationToken cancellationToken);
+    protected abstract ValueTask ReadSnapshotAsync(Stream stream, CancellationToken cancellationToken);
+
+    public async ValueTask SaveSnapshotAsync(CancellationToken cancellationToken = default)
     {
-        await channel.Writer.WriteAsync(new LogCommand(data), cancellationToken);
+        var command = new SaveCommand();
+        await channel.Writer.WriteAsync(command, cancellationToken);
+        await command.Task.WaitAsync(cancellationToken);
     }
 
-    protected abstract ValueTask ApplyAsync(
-        ReadOnlyMemory<byte> data,
-        CancellationToken cancellationToken);
-
-    protected abstract ValueTask WriteSnapshotAsync(
-        Stream stream,
-        CancellationToken cancellationToken);
-    public async ValueTask SaveSnapshotAsync(
-        CancellationToken cancellationToken = default)
-    {
-        var taskSource = new TaskCompletionSource();
-        await channel.Writer.WriteAsync(new SaveCommand(taskSource), cancellationToken);
-        await taskSource.Task;
-    }
-
-    public virtual async ValueTask RestoreSnapshotAsync(CancellationToken cancellationToken)
+    public virtual async ValueTask InitializeAsync(CancellationToken cancellationToken)
     {
         await sync.WaitAsync(cancellationToken);
 
@@ -182,10 +214,12 @@ internal abstract class WriteAheadLog : IDisposable, IAsyncDisposable
             while (logStream.Position < logStream.Length)
             {
                 var length = logStream.ReadInt();
-                using var buffer = MemoryPool<byte>.Shared.Rent(length);
-                var memory = buffer.Memory.Slice(0, length);
+                var memory = buffer.GetMemory(length).Slice(0, length);
                 await logStream.ReadExactlyAsync(memory, cancellationToken);
-                await ApplyAsync(memory, cancellationToken);
+
+                var record = Deserialize(memory);
+                await ApplyAsync(record, cancellationToken);
+                ResetBuffer();
             }
         }
         finally
@@ -195,13 +229,11 @@ internal abstract class WriteAheadLog : IDisposable, IAsyncDisposable
         }
     }
 
-    protected abstract ValueTask ReadSnapshotAsync(FileStream stream, CancellationToken cancellationToken);
-
-    public async Task FlushAsync()
+    public async Task FlushAsync(CancellationToken cancellationToken)
     {
-        var taskSource = new TaskCompletionSource();
-        await channel.Writer.WriteAsync(new FlushCommand(taskSource));
-        await taskSource.Task;
+        var command = new FlushCommand();
+        await channel.Writer.WriteAsync(command, cancellationToken);
+        await command.Task.WaitAsync(cancellationToken);
     }
 
     public virtual async ValueTask DisposeAsync()
@@ -209,7 +241,7 @@ internal abstract class WriteAheadLog : IDisposable, IAsyncDisposable
         if (!IsDisposed)
         {
             IsDisposed = true;
-            await FlushAsync();
+            await FlushAsync(ctSource.Token);
             ctSource.Cancel();
             ctSource.Dispose();
             logStream.Dispose();
@@ -219,8 +251,26 @@ internal abstract class WriteAheadLog : IDisposable, IAsyncDisposable
 
     public void Dispose() => DisposeAsync().GetAwaiter().GetResult();
 
-    private interface ICommand { }
-    private record LogCommand(ReadOnlyMemory<byte> Value) : ICommand;
-    private record FlushCommand(TaskCompletionSource TaskSource) : ICommand;
-    private record SaveCommand(TaskCompletionSource TaskSource) : ICommand;
+    public enum Durability
+    {
+        /// <summary>Queue the record without waiting for persistence.</summary>
+        None,
+
+        /// <summary>Wait until the record has been written to the stream.</summary>
+        Write,
+
+        /// <summary>Wait until the record has been flushed.</summary>
+        Flush
+    }
+
+    private abstract record class Command
+    {
+        private readonly TaskCompletionSource TaskSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        public void Complete() => TaskSource.SetResult();
+        public Task Task => TaskSource.Task;
+    }
+
+    private record AppendCommand(T Value, Durability durability) : Command;
+    private record FlushCommand : Command;
+    private record SaveCommand : Command;
 }

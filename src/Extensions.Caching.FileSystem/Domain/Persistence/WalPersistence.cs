@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace Eryri.Extensions.Caching.FileSystem.Domain.Persistence;
 
-internal class WalPersistence : WriteAheadLog, IPersistence
+internal class WalPersistence : WriteAheadLog<Mutation>, IPersistence
 {
     private readonly Manifest manifest;
     private readonly CacheDirectoryOwner directoryOwner;
@@ -25,24 +25,14 @@ internal class WalPersistence : WriteAheadLog, IPersistence
     }
 
     public ValueTask Insert(Metadata value, CancellationToken cancellationToken) =>
-        Append(value, MutationType.Insert, cancellationToken);
+        AppendAsync(new Mutation(MutationType.Insert, value), cancellationToken);
     public ValueTask Update(Metadata value, CancellationToken cancellationToken) =>
-        Append(value, MutationType.Update, cancellationToken);
+        AppendAsync(new Mutation(MutationType.Update, value), cancellationToken);
     public ValueTask Delete(Metadata value, CancellationToken cancellationToken) =>
-        Append(value, MutationType.Delete, cancellationToken);
+        AppendAsync(new Mutation(MutationType.Delete, value), cancellationToken);
 
-    private async ValueTask Append(Metadata value, MutationType type, CancellationToken cancellationToken)
+    protected override ValueTask ApplyAsync(Mutation mutation, CancellationToken cancellationToken)
     {
-        var mutation = new Mutation(type, value);
-        var writer = new ArrayBufferWriter<byte>();
-        writer.Write(mutation);
-        await AppendAsync(writer.WrittenSpan.ToArray(), cancellationToken);
-    }
-
-    protected override ValueTask ApplyAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
-    {
-        data.Span.ReadMutation(out var mutation);
-
         if (mutation.Type == MutationType.Insert)
         {
             manifest.AddOrReplace(mutation.Value, out _);
@@ -66,7 +56,7 @@ internal class WalPersistence : WriteAheadLog, IPersistence
         return ValueTask.CompletedTask;
     }
 
-    protected override async ValueTask ReadSnapshotAsync(FileStream stream, CancellationToken cancellationToken)
+    protected override async ValueTask ReadSnapshotAsync(Stream stream, CancellationToken cancellationToken)
     {
         await foreach (var item in stream.ReadMetadataValues(cancellationToken))
         {
@@ -79,9 +69,9 @@ internal class WalPersistence : WriteAheadLog, IPersistence
         await stream.Write(manifest.Values, cancellationToken);
     }
 
-    public override async ValueTask RestoreSnapshotAsync(CancellationToken cancellationToken)
+    public override async ValueTask InitializeAsync(CancellationToken cancellationToken)
     {
-        await base.RestoreSnapshotAsync(cancellationToken);
+        await base.InitializeAsync(cancellationToken);
         var paths = manifest.Values.Select(x => x.Path).ToHashSet();
         var allFiles = directoryOwner.Directory.GetFiles("*bytes", new EnumerationOptions { RecurseSubdirectories = true });
 
@@ -92,6 +82,14 @@ internal class WalPersistence : WriteAheadLog, IPersistence
                 file.Delete();
             }
         }
+    }
+
+    protected override void Serialize(Mutation mutation, IBufferWriter<byte> buffer) => buffer.Write(mutation);
+
+    protected override Mutation Deserialize(ReadOnlyMemory<byte> record)
+    {
+        record.Span.ReadMutation(out var mutation);
+        return mutation;
     }
 
     public override ValueTask DisposeAsync()

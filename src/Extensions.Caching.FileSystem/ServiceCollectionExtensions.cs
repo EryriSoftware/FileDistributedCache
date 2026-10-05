@@ -3,7 +3,6 @@ using Eryri.Extensions.Caching.FileSystem.Domain.Persistence;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Options;
 
 namespace Eryri.Extensions.Caching.FileSystem;
 

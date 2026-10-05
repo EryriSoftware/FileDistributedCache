@@ -29,7 +29,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         this.persistance = persistance;
         cacheDirectory = directoryOwner.Directory;
 
-        persistance.RestoreSnapshotAsync(CancellationToken.None).GetAwaiter().GetResult();
+        persistance.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
         RemoveExpired();
     }
 
