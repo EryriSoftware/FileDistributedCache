@@ -150,7 +150,7 @@ internal class ReadWriteTests
     public void Is_Persistant_With_Snapshot()
     {
         // Arrange
-        var keys = Enumerable.Range(0, 10).Select(d => Guid.NewGuid().ToString("N")).ToArray();
+        var keys = Enumerable.Range(0, 100).Select(d => Guid.NewGuid().ToString("N")).ToArray();
         var directory = Directory.CreateTempSubdirectory();
         var payload = RandomNumberGenerator.GetBytes(10);
 
