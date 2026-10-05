@@ -267,11 +267,14 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         try
         {
-            File.Delete(path);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
         }
         catch (Exception ex)
         {
-            logger?.LogCritical(ex, "Failed to delete cache file");
+            logger?.LogWarning(ex, "Failed to delete cache file");
         }
     }
 
