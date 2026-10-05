@@ -114,7 +114,8 @@ internal class ReadWriteTests
             {
                 var options = new DistributedCacheEntryOptions
                 {
-                    AbsoluteExpiration = ctx.Now.AddDays(1)
+                    AbsoluteExpiration = ctx.Now.AddDays(1000),
+                    SlidingExpiration = TimeSpan.FromDays(1000)
                 };
 
                 Parallel.ForEach(keys, key =>
@@ -147,7 +148,7 @@ internal class ReadWriteTests
     }
 
     [Test]
-    public void Is_Persistant_With_Snapshot()
+    public async Task Is_Persistant_With_Snapshot()
     {
         // Arrange
         var keys = Enumerable.Range(0, 100).Select(d => Guid.NewGuid().ToString("N")).ToArray();
@@ -156,13 +157,13 @@ internal class ReadWriteTests
 
         try
         {
-            using (var ctx = new CacheContext(cacheDirectory: directory.FullName, snapshotInterval: TimeSpan.Zero))
+            using (var ctx = new CacheContext(cacheDirectory: directory.FullName))
             {
                 var options = new DistributedCacheEntryOptions
                 {
-                    AbsoluteExpiration = ctx.Now.AddDays(1)
+                    AbsoluteExpiration = ctx.Now.AddDays(1000),
+                    SlidingExpiration = TimeSpan.FromDays(1000)
                 };
-
                 Parallel.ForEach(keys, key =>
                 {
                     // Act
@@ -172,6 +173,9 @@ internal class ReadWriteTests
                     // Assert
                     actual.Should().BeEquivalentTo(payload);
                 });
+
+                ctx.Advance(TimeSpan.FromDays(1));
+                await Task.Yield();
             }
 
             using (var ctx = new CacheContext(cacheDirectory: directory.FullName))

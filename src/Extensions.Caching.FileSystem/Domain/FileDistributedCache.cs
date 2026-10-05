@@ -328,12 +328,13 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         QueueCleanup(entry.ExpirationTicks);
     }
 
+    private static readonly TimeSpan MaxTimerDelay = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
     private void QueueCleanup(long? dueTimeTicks)
     {
         if (dueTimeTicks is { } dueTicks && dueTicks <= nextCleanup)
         {
             nextCleanup = dueTicks;
-            var seconds = Math.Max(minScanFrequencyTicks, dueTicks - timeProvider.GetUtcNow().UtcTicks);
+            var seconds = Math.Clamp(dueTicks - timeProvider.GetUtcNow().UtcTicks, minScanFrequencyTicks, MaxTimerDelay.Ticks);
             cleanupTimer.Change(TimeSpan.FromTicks(seconds), Timeout.InfiniteTimeSpan);
         }
     }

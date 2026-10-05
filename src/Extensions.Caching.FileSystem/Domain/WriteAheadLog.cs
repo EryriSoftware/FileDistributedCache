@@ -1,10 +1,12 @@
 ﻿using System.Buffers;
-using System.Buffers.Binary;
 using System.Threading.Channels;
+using Eryri.Extensions.Caching.FileSystem.Extensions;
+
 namespace Eryri.Extensions.Caching.FileSystem.Domain;
 
-internal abstract class WriteAheadLog : IDisposable
+internal abstract class WriteAheadLog : IAsyncDisposable
 {
+    protected bool IsDisposed { get; private set; }
     private bool hasChanges = false;
     private const int BufferSize = 64 << 10; // 64 KB
     private readonly string directory;
@@ -61,10 +63,7 @@ internal abstract class WriteAheadLog : IDisposable
         if (command is LogCommand log)
         {
             Interlocked.Exchange(ref hasChanges, true);
-            using var buffer = MemoryPool<byte>.Shared.Rent(4);
-            var header = buffer.Memory.Slice(0, 4).Span;
-            BinaryPrimitives.WriteInt32LittleEndian(header, log.Value.Length);
-            logStream.Write(header);
+            logStream.Write(log.Value.Length);
             await logStream.WriteAsync(log.Value, cancellationToken);
         }
         else if (command is FlushCommand flush)
@@ -144,16 +143,10 @@ internal abstract class WriteAheadLog : IDisposable
 
             logStream.Seek(0, SeekOrigin.Begin);
 
-            using var headerBuffer = MemoryPool<byte>.Shared.Rent(4);
-            var header = headerBuffer.Memory.Slice(0, 4);
-
             while (logStream.Position < logStream.Length)
             {
-                await logStream.ReadExactlyAsync(header, cancellationToken);
-                var length = BinaryPrimitives.ReadInt32LittleEndian(header.Span);
-
+                var length = logStream.ReadInt();
                 using var buffer = MemoryPool<byte>.Shared.Rent(length);
-
                 var memory = buffer.Memory.Slice(0, length);
                 await logStream.ReadExactlyAsync(memory, cancellationToken);
                 await ApplyAsync(memory, cancellationToken);
@@ -175,13 +168,17 @@ internal abstract class WriteAheadLog : IDisposable
         await taskSource.Task;
     }
 
-    public void Dispose()
+    public virtual async ValueTask DisposeAsync()
     {
-        FlushAsync().GetAwaiter().GetResult();
-        ctSource.Cancel();
-        ctSource.Dispose();
-        logStream.Dispose();
-        sync.Dispose();
+        if (!IsDisposed)
+        {
+            IsDisposed = true;
+            await FlushAsync();
+            ctSource.Cancel();
+            ctSource.Dispose();
+            logStream.Dispose();
+            sync.Dispose();
+        }
     }
 
     private interface ICommand { }

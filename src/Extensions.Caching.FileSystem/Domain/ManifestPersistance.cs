@@ -1,5 +1,4 @@
 ﻿using System.Buffers;
-using System.Text.Json;
 using Eryri.Extensions.Caching.FileSystem.Extensions;
 using Eryri.Extensions.Caching.FileSystem.Models;
 using Microsoft.Extensions.Options;
@@ -12,6 +11,8 @@ internal class ManifestPersistance : WriteAheadLog
     private readonly CacheDirectoryOwner directoryOwner;
     private readonly FileCacheOptions options;
 
+    private ITimer snapshotSchedule;
+
     public ManifestPersistance(
         Manifest manifest,
         CacheDirectoryOwner directoryOwner,
@@ -21,7 +22,7 @@ internal class ManifestPersistance : WriteAheadLog
         this.manifest = manifest;
         this.directoryOwner = directoryOwner;
         this.options = options.Value;
-        timeProvider.CreateTimer(_ => _ = SaveSnapshotAsync(), null, options.Value.SnapshotInterval, options.Value.SnapshotInterval);
+        snapshotSchedule = timeProvider.CreateTimer(_ => SaveSnapshotAsync().GetAwaiter().GetResult(), null, options.Value.SnapshotInterval, options.Value.SnapshotInterval);
     }
 
     public ValueTask Insert(Metadata value, CancellationToken cancellationToken) =>
@@ -37,11 +38,6 @@ internal class ManifestPersistance : WriteAheadLog
         var writer = new ArrayBufferWriter<byte>();
         writer.Write(mutation);
         await AppendAsync(writer.WrittenSpan.ToArray(), cancellationToken);
-
-        if (options.SnapshotInterval <= TimeSpan.Zero)
-        {
-            _ = SaveSnapshotAsync(cancellationToken);
-        }
     }
 
     protected override ValueTask ApplyAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
@@ -97,5 +93,15 @@ internal class ManifestPersistance : WriteAheadLog
                 file.Delete();
             }
         }
+    }
+
+    public override ValueTask DisposeAsync()
+    {
+        if (!IsDisposed)
+        {
+            snapshotSchedule.DisposeAsync();
+        }
+
+        return base.DisposeAsync();
     }
 }
