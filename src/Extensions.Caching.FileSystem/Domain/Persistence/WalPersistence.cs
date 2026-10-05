@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace Eryri.Extensions.Caching.FileSystem.Domain;
 
-internal class ManifestPersistance : WriteAheadLog
+internal class WalPersistence : WriteAheadLog, IPersistence
 {
     private readonly Manifest manifest;
     private readonly CacheDirectoryOwner directoryOwner;
@@ -13,7 +13,7 @@ internal class ManifestPersistance : WriteAheadLog
 
     private ITimer snapshotSchedule;
 
-    public ManifestPersistance(
+    public WalPersistence(
         Manifest manifest,
         CacheDirectoryOwner directoryOwner,
         IOptions<FileCacheOptions> options,

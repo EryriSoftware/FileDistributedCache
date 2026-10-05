@@ -14,7 +14,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     public FileDistributedCache(
         TimeProvider timeProvider,
         Manifest manifest,
-        ManifestPersistance persistance,
+        IPersistence persistance,
         CacheDirectoryOwner directoryOwner,
         IOptions<FileCacheOptions> optionsAccessor,
         ILogger<FileDistributedCache>? logger = null)
@@ -40,7 +40,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     private readonly TimeProvider timeProvider;
     private readonly DirectoryInfo cacheDirectory;
     private readonly Manifest manifest;
-    private readonly ManifestPersistance persistance;
+    private readonly IPersistence persistance;
     private long nextCleanup = DateTimeOffset.MaxValue.UtcTicks;
     private readonly ITimer cleanupTimer;
 

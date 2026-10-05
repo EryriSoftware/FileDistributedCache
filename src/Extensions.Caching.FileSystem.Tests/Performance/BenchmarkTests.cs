@@ -21,7 +21,11 @@ public class BenchmarkTests
     {
         public Eryri_FileDistributedCache_Tests()
         {
-            services.AddDistributedFileCache(d => d.SizeLimitBytes = SizeLimit);
+            services.AddDistributedFileCache(d =>
+            {
+                d.SizeLimitBytes = SizeLimit;
+                d.CacheDirectory = cacheDirectory.FullName;
+            });
         }
     }
 

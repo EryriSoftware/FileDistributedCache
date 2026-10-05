@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace Eryri.Extensions.Caching.FileSystem;
 
@@ -23,7 +24,14 @@ public static class ServiceCollectionExtensions
             services.AddOptionsWithValidateOnStart<FileCacheOptions>(nameof(FileCacheOptions));
             services.TryAddSingleton<CacheDirectoryOwner>();
             services.TryAddSingleton<Manifest>();
-            services.TryAddSingleton<ManifestPersistance>();
+            services.TryAddSingleton<IPersistence>(sp =>
+            {
+                var directoryOwner = sp.GetRequiredService<CacheDirectoryOwner>();
+
+                return directoryOwner.IsPersistent
+                    ? ActivatorUtilities.CreateInstance<WalPersistence>(sp)
+                    : ActivatorUtilities.CreateInstance<NoPersistence>(sp);
+            });
             services.TryAddSingleton<FileDistributedCache>();
             services.TryAddSingleton<IFileDistributedCache>(sp => sp.GetRequiredService<FileDistributedCache>());
             services.TryAddSingleton<IDistributedCache>(sp => sp.GetRequiredService<FileDistributedCache>());
