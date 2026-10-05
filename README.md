@@ -159,31 +159,31 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 > 1s == 1000ms, 1ms == 1000us, 1us == 1000ns
 
 ### [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
-| Method           | Mean      | StdDev    | Median    |
-|----------------- |----------:|----------:|----------:|
-| Set              | 11.266 ms |  0.153 ms | 11.282 ms |
-| SetBuffered      | 16.982 ms |  8.059 ms | 11.888 ms |
-| SetAsync         | 26.796 ms | 21.526 ms | 12.326 ms |
-| SetBufferedAsync | 12.068 ms |  0.149 ms | 12.130 ms |
-| Get              |  6.479 ms |  0.264 ms |  6.371 ms |
-| GetBuffered      |  0.088 ms |  0.006 ms |  0.087 ms |
-| GetAsync         |  7.380 ms |  0.160 ms |  7.368 ms |
-| GetBufferedAsync |  8.012 ms |  0.366 ms |  7.816 ms |
+| Method           | Mean      | StdDev   |
+|----------------- |----------:|---------:|
+| Set              | 14.714 ms | 3.917 ms |
+| SetBuffered      | 14.211 ms | 2.949 ms |
+| SetAsync         | 12.989 ms | 0.445 ms |
+| SetBufferedAsync | 13.119 ms | 0.561 ms |
+| Get              |  7.568 ms | 0.522 ms |
+| GetBuffered      |  0.076 ms | 0.004 ms |
+| GetAsync         |  7.517 ms | 0.150 ms |
+| GetBufferedAsync |  7.633 ms | 0.396 ms |
 
 > [!Note]
 > This cache is ephemeral, designed for single-process use.
 
 ### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
-| Method           | Mean       | StdDev     | Median     |
-|----------------- |-----------:|-----------:|-----------:|
-| Set              | 131.240 ms | 74.9640 ms | 134.931 ms |
-| SetBuffered      | 103.216 ms | 44.8429 ms | 126.566 ms |
-| SetAsync         |  86.140 ms | 48.0967 ms |  72.709 ms |
-| SetBufferedAsync |  85.709 ms | 37.0179 ms |  78.982 ms |
-| Get              |  13.961 ms |  0.9503 ms |  14.264 ms |
-| GetBuffered      |   1.114 ms |  0.0878 ms |   1.118 ms |
-| GetAsync         |  17.721 ms |  0.2950 ms |  17.718 ms |
-| GetBufferedAsync |  17.408 ms |  0.1704 ms |  17.430 ms |
+| Method           | Mean      | StdDev     |
+|----------------- |----------:|-----------:|
+| Set              | 75.636 ms | 17.2669 ms |
+| SetBuffered      | 62.195 ms |  7.9960 ms |
+| SetAsync         | 62.249 ms |  9.4437 ms |
+| SetBufferedAsync | 59.689 ms |  6.4675 ms |
+| Get              | 14.557 ms |  2.0937 ms |
+| GetBuffered      |  1.019 ms |  0.0097 ms |
+| GetAsync         | 18.243 ms |  0.5280 ms |
+| GetBufferedAsync | 18.552 ms |  0.2884 ms |
 
 > [!Note]
 > This cache is designed for single-process use.
