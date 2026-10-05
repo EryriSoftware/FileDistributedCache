@@ -66,7 +66,7 @@ public record FileCacheOptions
 
     /// <summary>
     /// Gets or sets the directory where cache files are stored.
-    /// Defaults to a tmp directoryy that's deletet when the application shuts down.
+    /// Defaults to a tmp directory that's deleted when the application shuts down.
     /// </summary>
     public string? CacheDirectory { get; set; }
 
