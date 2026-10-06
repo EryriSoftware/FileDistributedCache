@@ -94,7 +94,7 @@ public class BenchmarkTests
             if (isDisposing)
             {
                 disposable?.Dispose();
-                Directory.Delete(cacheDirectory.FullName, recursive: true);
+                cacheDirectory.Delete(recursive: true);
             }
         }
 

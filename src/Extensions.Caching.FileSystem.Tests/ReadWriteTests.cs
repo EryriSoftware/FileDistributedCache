@@ -143,7 +143,7 @@ internal class ReadWriteTests
         }
         finally
         {
-            Directory.Delete(directory.FullName, recursive: true);
+            directory.Delete(recursive: true);
         }
     }
 
@@ -192,7 +192,7 @@ internal class ReadWriteTests
         }
         finally
         {
-            Directory.Delete(directory.FullName, recursive: true);
+            directory.Delete(recursive: true);
         }
     }
 }
