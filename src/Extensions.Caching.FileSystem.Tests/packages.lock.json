@@ -129,6 +129,11 @@
         "resolved": "2.9.1",
         "contentHash": "OE0sl1/sQ37bjVsPKKtwQlWDgqaxWgtme3xZz7JssWUzg5JpMIyHgCTY9MVMxOg48fJ1AgGT3tgdH5m/kQ5xhA=="
       },
+      "Eryri.Buffers": {
+        "type": "Transitive",
+        "resolved": "1.0.1",
+        "contentHash": "wsVFpjpOCskPXmOtHefxpA8OtSLuaF/MLn6dwYHeWKPMgMH3jEq76LO0fYjDc2exkOX1FtE02F+gnNP5TWdfYA=="
+      },
       "Fare": {
         "type": "Transitive",
         "resolved": "2.1.1",
@@ -369,10 +374,21 @@
       "Eryri.FileDistributedCache": {
         "type": "Project",
         "dependencies": {
+          "Eryri.WriteAheadLog": "[1.0.0, )",
           "Microsoft.Extensions.Caching.Abstractions": "[10.0.0, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.0, )",
           "Microsoft.Extensions.Options": "[10.0.0, )",
           "System.IO.Hashing": "[10.0.0, )"
+        }
+      },
+      "Eryri.WriteAheadLog": {
+        "type": "CentralTransitive",
+        "requested": "[1.0.0, )",
+        "resolved": "1.0.0",
+        "contentHash": "6ATg8M5aXRmBoLgiwq3ZW+VeqHFc96T/nhIRyccx2iGe5RNzTqcnTyqzkztOE1cUx4+bzPDYf6Sz1SM+BLMmHw==",
+        "dependencies": {
+          "Eryri.Buffers": "1.0.1",
+          "System.IO.Hashing": "10.0.0"
         }
       },
       "Microsoft.Extensions.Caching.Abstractions": {

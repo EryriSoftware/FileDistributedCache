@@ -1,7 +1,7 @@
 ﻿using System.Buffers;
 using Eryri.Extensions.Caching.FileSystem.Extensions;
 using Eryri.Extensions.Caching.FileSystem.Models;
-using Eryri.Extensions.Caching.FileSystem.Wal;
+using Eryri.WriteAheadLog;
 using Microsoft.Extensions.Options;
 
 namespace Eryri.Extensions.Caching.FileSystem.Domain.Persistence;
@@ -70,7 +70,7 @@ internal class WalPersistence : WriteAheadLog<Mutation>, IPersistence
         await stream.Write(manifest.Values, cancellationToken);
     }
 
-    public override async ValueTask InitializeAsync(CancellationToken cancellationToken)
+    public override async Task InitializeAsync(CancellationToken cancellationToken)
     {
         await base.InitializeAsync(cancellationToken);
         var paths = manifest.Values.Select(x => x.Path).ToHashSet();

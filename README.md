@@ -160,28 +160,28 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 > 1s == 1000ms, 1ms == 1000us, 1us == 1000ns
 
 ### [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
-| Method           | Mean      | StdDev   |
-|----------------- |----------:|---------:|
-| Set              | 14.714 ms | 3.917 ms |
-| SetBuffered      | 14.211 ms | 2.949 ms |
-| SetAsync         | 12.989 ms | 0.445 ms |
-| SetBufferedAsync | 13.119 ms | 0.561 ms |
-| Get              |  7.568 ms | 0.522 ms |
-| GetBuffered      |  0.076 ms | 0.004 ms |
-| GetAsync         |  7.517 ms | 0.150 ms |
-| GetBufferedAsync |  7.633 ms | 0.396 ms |
+| Method           | Mean         | StdDev       | Median       |
+|----------------- |-------------:|-------------:|-------------:|
+| Set              | 12,879.29 us |   955.965 us | 12,722.89 us |
+| SetBuffered      | 17,960.79 us | 8,211.567 us | 13,137.58 us |
+| SetAsync         | 14,512.19 us | 2,845.222 us | 13,345.48 us |
+| SetBufferedAsync | 13,184.98 us |   399.919 us | 13,134.07 us |
+| Get              |  6,154.76 us |   216.441 us |  6,256.37 us |
+| GetBuffered      |     85.20 us |     4.742 us |     83.76 us |
+| GetAsync         |  6,782.77 us |    81.746 us |  6,786.04 us |
+| GetBufferedAsync |  7,541.43 us |   359.949 us |  7,579.14 us |
 
 ### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
-| Method           | Mean      | StdDev     |
-|----------------- |----------:|-----------:|
-| Set              | 75.636 ms | 17.2669 ms |
-| SetBuffered      | 62.195 ms |  7.9960 ms |
-| SetAsync         | 62.249 ms |  9.4437 ms |
-| SetBufferedAsync | 59.689 ms |  6.4675 ms |
-| Get              | 14.557 ms |  2.0937 ms |
-| GetBuffered      |  1.019 ms |  0.0097 ms |
-| GetAsync         | 18.243 ms |  0.5280 ms |
-| GetBufferedAsync | 18.552 ms |  0.2884 ms |
+| Method           | Mean       | StdDev      | Median     |
+|----------------- |-----------:|------------:|-----------:|
+| Set              | 155.053 ms | 114.0786 ms | 110.185 ms |
+| SetBuffered      | 201.617 ms | 131.7409 ms | 201.687 ms |
+| SetAsync         | 129.286 ms |  71.6261 ms | 115.980 ms |
+| SetBufferedAsync | 116.472 ms |  49.0898 ms | 117.823 ms |
+| Get              |  14.384 ms |   0.5454 ms |  14.570 ms |
+| GetBuffered      |   1.013 ms |   0.0577 ms |   1.003 ms |
+| GetAsync         |  18.109 ms |   0.1486 ms |  18.063 ms |
+| GetBufferedAsync |  18.546 ms |   0.4131 ms |  18.373 ms |
 
 > [!Warning]
 > - Size limits are eventual, not strict.
