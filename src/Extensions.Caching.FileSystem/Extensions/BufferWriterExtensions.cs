@@ -1,6 +1,5 @@
 ﻿using System.Buffers;
-using System.Buffers.Binary;
-using System.Text;
+using Eryri.Buffers.Extensions;
 using Eryri.Extensions.Caching.FileSystem.Extensions;
 using Eryri.Extensions.Caching.FileSystem.Models;
 
@@ -31,52 +30,14 @@ internal static class BufferWriterExtensions
         return writer;
     }
 
-    public static IBufferWriter<byte> Write(this IBufferWriter<byte> writer, string value)
-    {
-        var byteCount = Encoding.UTF8.GetByteCount(value);
-        writer.Write(byteCount);
-        var span = writer.GetSpan(byteCount);
-        Encoding.UTF8.GetBytes(value, span);
-        writer.Advance(byteCount);
-        return writer;
-    }
-
     public static IBufferWriter<byte> Write(this IBufferWriter<byte> writer, long? value)
     {
-        var span = writer.GetSpan(9);
-
-        span[0] = value.HasValue ? (byte)1 : (byte)0;
-        writer.Advance(1);
-
+        writer.Write(value.HasValue);
         if (value.HasValue)
         {
-            BinaryPrimitives.WriteInt64LittleEndian(
-                span[1..],
-                value.GetValueOrDefault());
-            writer.Advance(8);
+            writer.Write(value.Value);
         }
 
-        return writer;
-    }
-
-    public static IBufferWriter<byte> Write(this IBufferWriter<byte> writer, ulong value)
-    {
-        BinaryPrimitives.WriteUInt64LittleEndian(writer.GetSpan(8), value);
-        writer.Advance(8);
-        return writer;
-    }
-
-    public static IBufferWriter<byte> Write(this IBufferWriter<byte> writer, long value)
-    {
-        BinaryPrimitives.WriteInt64LittleEndian(writer.GetSpan(8), value);
-        writer.Advance(8);
-        return writer;
-    }
-
-    public static IBufferWriter<byte> Write(this IBufferWriter<byte> writer, int value)
-    {
-        BinaryPrimitives.WriteInt32LittleEndian(writer.GetSpan(4), value);
-        writer.Advance(4);
         return writer;
     }
 
@@ -118,40 +79,17 @@ internal static class BufferWriterExtensions
         return read;
     }
 
-    public static int ReadString(this ReadOnlySpan<byte> reader, out string value)
-    {
-        var read = reader.ReadInt(out var length);
-        value = Encoding.UTF8.GetString(reader.Slice(read, length));
-        return read + length;
-    }
-
     public static int ReadMaybeLong(this ReadOnlySpan<byte> reader, out long? value)
     {
-        if (BitConverter.ToBoolean(reader.Slice(0, 1)))
+        var offset = reader.ReadBoolean(out var hasValue);
+        if (hasValue)
         {
-            value = BinaryPrimitives.ReadInt64LittleEndian(reader.Slice(1, 8));
-            return 9;
+            offset += reader.ReadLong(out var actual);
+            value = actual;
+            return offset;
         }
 
         value = null;
-        return 1;
-    }
-
-    public static int ReadLong(this ReadOnlySpan<byte> reader, out long value)
-    {
-        value = BinaryPrimitives.ReadInt64LittleEndian(reader.Slice(0, 8));
-        return 8;
-    }
-
-    public static int ReadULong(this ReadOnlySpan<byte> reader, out ulong value)
-    {
-        value = BinaryPrimitives.ReadUInt64LittleEndian(reader.Slice(0, 8));
-        return 8;
-    }
-
-    public static int ReadInt(this ReadOnlySpan<byte> reader, out int value)
-    {
-        value = BinaryPrimitives.ReadInt32LittleEndian(reader.Slice(0, 4));
-        return 4;
+        return offset;
     }
 }

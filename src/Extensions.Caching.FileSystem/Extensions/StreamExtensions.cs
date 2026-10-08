@@ -1,21 +1,12 @@
 ﻿using System.Buffers;
-using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
-using System.Text;
+using Eryri.Buffers.Extensions;
 using Eryri.Extensions.Caching.FileSystem.Models;
 
 namespace Eryri.Extensions.Caching.FileSystem.Extensions;
 
 internal static class StreamExtensions
 {
-    public static void Write(this Stream stream, int value)
-    {
-        using var buffer = MemoryPool<byte>.Shared.Rent(4);
-        var header = buffer.Memory.Slice(0, 4).Span;
-        BinaryPrimitives.WriteInt32LittleEndian(header, value);
-        stream.Write(header);
-    }
-
     public static async Task Write(this Stream stream, ICollection<Metadata> values, CancellationToken cancellationToken)
     {
         var writer = new ArrayBufferWriter<byte>();
@@ -67,42 +58,10 @@ internal static class StreamExtensions
         };
     }
 
-    public static string ReadString(this Stream stream)
-    {
-        var length = stream.ReadInt();
-        var buffer = MemoryPool<byte>.Shared.Rent(length);
-        stream.ReadExactly(buffer.Memory.Span.Slice(0, length));
-        return Encoding.UTF8.GetString(buffer.Memory.Span.Slice(0, length));
-    }
-
     public static long? ReadMaybeLong(this Stream stream)
     {
-        var buffer = MemoryPool<byte>.Shared.Rent(1);
-        stream.ReadExactly(buffer.Memory.Span.Slice(0, 1));
-
-        return BitConverter.ToBoolean(buffer.Memory.Span.Slice(0, 1))
+        return stream.ReadBoolean()
             ? stream.ReadLong()
             : null;
-    }
-
-    public static long ReadLong(this Stream stream)
-    {
-        var buffer = MemoryPool<byte>.Shared.Rent(8);
-        stream.ReadExactly(buffer.Memory.Span.Slice(0, 8));
-        return BinaryPrimitives.ReadInt64LittleEndian(buffer.Memory.Span.Slice(0, 8));
-    }
-
-    public static ulong ReadULong(this Stream stream)
-    {
-        var buffer = MemoryPool<byte>.Shared.Rent(8);
-        stream.ReadExactly(buffer.Memory.Span.Slice(0, 8));
-        return BinaryPrimitives.ReadUInt64LittleEndian(buffer.Memory.Span.Slice(0, 8));
-    }
-
-    public static int ReadInt(this Stream stream)
-    {
-        var buffer = MemoryPool<byte>.Shared.Rent(4);
-        stream.ReadExactly(buffer.Memory.Span.Slice(0, 4));
-        return BinaryPrimitives.ReadInt32LittleEndian(buffer.Memory.Span.Slice(0, 4));
     }
 }
