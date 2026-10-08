@@ -1,6 +1,6 @@
 ﻿namespace Eryri.Extensions.Caching.FileSystem.Models;
 
-internal sealed record FileCacheMetadata(
+internal sealed record Metadata(
     string Key,
     string Path,
     long SizeBytes,

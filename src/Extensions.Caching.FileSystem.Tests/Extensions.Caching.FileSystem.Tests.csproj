@@ -8,10 +8,13 @@
 
 	<ItemGroup>
 		<PackageReference Include="BenchmarkDotNet" />
+		<PackageReference Include="Caching.FileBackedDistributedCache" />
 		<PackageReference Include="DamianH.FileDistributedCache" />
+		<PackageReference Include="LiteDb.Extensions.Caching" />
 		<PackageReference Include="Microsoft.Extensions.Logging" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
 		<PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+		<PackageReference Include="NeoSmart.Caching.Sqlite.AspNetCore" />
 	</ItemGroup>
 
 	<ItemGroup>

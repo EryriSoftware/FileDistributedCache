@@ -3,16 +3,20 @@
 [![NuGet](https://img.shields.io/nuget/v/Eryri.FileDistributedCache.svg)](https://www.nuget.org/packages/Eryri.FileDistributedCache)
 [![NuGet Downloads](https://img.shields.io/nuget/dt/Eryri.FileDistributedCache.svg)](https://www.nuget.org/packages/Eryri.FileDistributedCache)
 
-**Keep more reusable data without giving more RAM to your cache—or running another cache service.** Eryri.FileDistributedCache stores disposable cache values on the local filesystem behind .NET's `IDistributedCache` and `IBufferDistributedCache` APIs.
+**Keep more reusable data without giving more RAM to your cache—or running another cache service.**
+
+`Eryri.FileDistributedCache` stores cache values on the local filesystem behind .NET's `IDistributedCache` and `IBufferDistributedCache` APIs.
 
 Give it a byte limit and it evicts entries to make room *before* admitting a new write; expired entries are cleaned up automatically.
+
+Use an **ephemeral cache** when you only need local disk capacity, or provide a persistent cache directory when you want entries to **survive process restarts**. Persistent caches use a write-ahead log with periodic snapshots to recover efficiently without keeping the entire cache index in memory.
 
 It is built for a **single process**, with concurrent access, configurable eviction, synchronous and asynchronous operations, and Native AOT compatibility.
 
 Use it directly when local disk is the right cache, or register it as the secondary provider for `HybridCache` when you want a memory-first cache with a larger local-disk tier.
 
 > [!IMPORTANT]
-> **Local, ephemeral, not shared.** `IDistributedCache` is the interface this package implements, not a promise of distributed storage. Each process has its own cache; entries are disposable and must be recoverable from your source of truth. Do not use this provider when replicas must share entries or cache contents must survive restarts.
+> **Local, single-process.** `IDistributedCache` is the interface this package implements, not a promise of distributed storage. Each process should have its own cache; do not use this provider when replicas must share entries.
 
 ## Why use it?
 
@@ -22,7 +26,7 @@ Use it directly when local disk is the right cache, or register it as the second
 - **Fit familiar .NET APIs.** Use `IDistributedCache` or `IBufferDistributedCache`; the implementation is thread-safe and Native AOT-compatible.
 - **Avoid a new service for a local need.** There is no cache server to deploy just to give one process more disposable cache capacity. The trade-off is that entries are not shared across processes.
 
-**Good fit:** a single-process service or worker with reproducible cache values and useful local disk space. **Not a fit:** cross-replica consistency, persistence, or a filesystem you cannot afford to fill with disposable data. The cache's configured byte limit controls its own entries; it does not reserve free space for other applications.
+**Good fit:** a single-process service or worker with reproducible cache values and useful local disk space. **Not a fit:** cross-replica consistency. The cache's configured byte limit controls its own entries; it does not reserve free space for other applications.
 
 ## Scope at a glance
 
@@ -33,7 +37,7 @@ Use it directly when local disk is the right cache, or register it as the second
 | Expiry eviction | Yes; automatic; rescheduled for the next expiry, using a priority queue rather than relying solely on fixed-interval sweeps |
 | Capacity-based eviction | Yes; set a byte limit for automatic capacity eviction |
 | Shared entries across application processes | No |
-| Cache persistence across restarts | No |
+| Cache persistence across restarts | Yes; If a persistent Cache Directory is supplied |
 | Automatic RAM-pressure-triggered spill | No; use as a disk-backed tier, not as an automatic memory overflow mechanism |
 
 ## Install and get started
@@ -134,13 +138,14 @@ For manual capacity reduction, `IFileDistributedCache.Compact(decimal percentage
 | `ExpirationScanFrequency` | Minimum interval between expiry cleanup runs; zero or a negative value schedules the next run for the soonest upcoming expiration. |
 | `DefaultSlidingExpiration` | Default sliding expiry where an entry does not specify one. |
 | `DefaultAbsoluteExpirationRelativeToNow` | Default relative absolute expiry, calculated when an entry is added. |
+| `CacheDirectory` | The persistent directory for cache files. No value indicates an ephemeral tmp directory should be used which will be deleted during normal shutdown. |
+| `SnapshotInterval` | If a persistent directory is supplied, determines how often the Write Ahead Log is compacted into a snapshot. |
 
 ## Operational boundaries
 
 - **One process owns one cache.** Do not share the cache directory or assume another process can observe its entries safely.
-- **Storage is temporary.** The cache creates a temporary folder under the current user's temp directory at startup and removes it during normal shutdown. Crashes or forced termination may leave files behind; do not rely on shutdown cleanup for durability or guaranteed reclamation.
-- **Misses are expected.** Cached values must be safe to lose and regenerable after expiration, eviction, restart, or storage failure.
-- **Filesystem access matters.** The process needs permission to create, read, write, and delete files in its temp directory. A configured cache-size limit does not protect against another workload filling the underlying filesystem.
+- **Misses are expected.** Cached values must be safe to lose and regenerable after expiration, eviction, or storage failure.
+- **Filesystem access matters.** The process needs permission to create, read, write, and delete files in its cache directory. A configured cache-size limit does not protect against another workload filling the underlying filesystem.
 - **Write failures:** If the filesystem rejects a write, the entry is not added and an error is logged. Callers should not treat `Set` as proof that the entry can later be read back.
 
 ## Benchmarks
@@ -159,37 +164,71 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 > 1s == 1000ms, 1ms == 1000us, 1us == 1000ns
 
 ### [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
-| Method           | Mean      | StdDev    | Median    |
-|----------------- |----------:|----------:|----------:|
-| Set              | 11.266 ms |  0.153 ms | 11.282 ms |
-| SetBuffered      | 16.982 ms |  8.059 ms | 11.888 ms |
-| SetAsync         | 26.796 ms | 21.526 ms | 12.326 ms |
-| SetBufferedAsync | 12.068 ms |  0.149 ms | 12.130 ms |
-| Get              |  6.479 ms |  0.264 ms |  6.371 ms |
-| GetBuffered      |  0.088 ms |  0.006 ms |  0.087 ms |
-| GetAsync         |  7.380 ms |  0.160 ms |  7.368 ms |
-| GetBufferedAsync |  8.012 ms |  0.366 ms |  7.816 ms |
-
-> [!Note]
-> This cache is ephemeral, designed for single-process use.
+| Method           | Mean      | Error     | StdDev    | Median    | Gen0   | Gen1   | Allocated |
+|----------------- |----------:|----------:|----------:|----------:|-------:|-------:|----------:|
+| Set              | 0.1399 ms | 0.2792 ms | 0.0432 ms | 0.1199 ms |      - |      - |    1.2 KB |
+| SetBuffered      | 0.1834 ms | 0.6407 ms | 0.0992 ms | 0.1356 ms |      - |      - |   1.36 KB |
+| SetAsync         | 0.1779 ms | 0.5594 ms | 0.0866 ms | 0.1426 ms |      - |      - |   1.93 KB |
+| SetBufferedAsync | 0.1795 ms | 0.5731 ms | 0.0887 ms | 0.1407 ms | 0.3333 |      - |   2.27 KB |
+| Get              | 0.0610 ms | 0.0257 ms | 0.0067 ms | 0.0655 ms | 1.6667 |      - |   4.58 KB |
+| GetBuffered      | 0.0662 ms | 0.0075 ms | 0.0019 ms | 0.0672 ms | 3.6667 | 0.6667 |  12.79 KB |
+| GetAsync         | 0.0736 ms | 0.0111 ms | 0.0029 ms | 0.0742 ms | 1.6667 |      - |   5.32 KB |
+| GetBufferedAsync | 0.0698 ms | 0.0121 ms | 0.0031 ms | 0.0678 ms | 4.0000 | 0.6667 |  13.68 KB |
 
 ### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
-| Method           | Mean       | StdDev     | Median     |
-|----------------- |-----------:|-----------:|-----------:|
-| Set              | 131.240 ms | 74.9640 ms | 134.931 ms |
-| SetBuffered      | 103.216 ms | 44.8429 ms | 126.566 ms |
-| SetAsync         |  86.140 ms | 48.0967 ms |  72.709 ms |
-| SetBufferedAsync |  85.709 ms | 37.0179 ms |  78.982 ms |
-| Get              |  13.961 ms |  0.9503 ms |  14.264 ms |
-| GetBuffered      |   1.114 ms |  0.0878 ms |   1.118 ms |
-| GetAsync         |  17.721 ms |  0.2950 ms |  17.718 ms |
-| GetBufferedAsync |  17.408 ms |  0.1704 ms |  17.430 ms |
-
-> [!Note]
-> This cache is designed for single-process use.
+| Method           | Mean      | Error     | StdDev    | Median    | Gen0   | Gen1   | Allocated |
+|----------------- |----------:|----------:|----------:|----------:|-------:|-------:|----------:|
+| Set              | 1.5264 ms | 4.3231 ms | 1.1227 ms | 1.0749 ms | 2.0000 | 0.3333 |   7.56 KB |
+| SetBuffered      | 1.0781 ms | 1.9726 ms | 0.5123 ms | 0.9659 ms | 1.6667 | 0.3333 |   7.56 KB |
+| SetAsync         | 2.1514 ms | 6.6831 ms | 1.7356 ms | 1.5289 ms | 1.3333 |      - |   7.31 KB |
+| SetBufferedAsync | 1.1642 ms | 2.5317 ms | 0.6575 ms | 1.2555 ms | 1.3333 | 0.3333 |   7.31 KB |
+| Get              | 0.1244 ms | 0.0229 ms | 0.0035 ms | 0.1242 ms | 4.6667 | 0.3333 |  13.28 KB |
+| GetBuffered      | 0.1472 ms | 0.0471 ms | 0.0122 ms | 0.1441 ms | 4.3333 | 1.3333 |  13.32 KB |
+| GetAsync         | 0.1820 ms | 0.0325 ms | 0.0084 ms | 0.1776 ms | 4.6667 | 1.0000 |  15.12 KB |
+| GetBufferedAsync | 0.1738 ms | 0.0126 ms | 0.0019 ms | 0.1737 ms | 4.6667 | 1.0000 |  15.19 KB |
 
 > [!Warning]
-> Size limits are eventual, not strict. Write methods publishes without checking MaxTotalSize or MaxEntries; eviction only acts on its periodic scan.
+> - Size limits are eventual, not strict.
+> - Write methods publishes without checking MaxTotalSize or MaxEntries
+> - Eviction only acts on its periodic scan. LRU policy only.
+
+### [NeoSmart.Caching.Sqlite](https://www.nuget.org/packages/NeoSmart.Caching.Sqlite)
+| Method           | Mean     | Error     | StdDev    | Gen0   | Allocated |
+|----------------- |---------:|----------:|----------:|-------:|----------:|
+| Set              | 4.201 ms | 5.1480 ms | 1.3369 ms | 0.3333 |   1.59 KB |
+| SetAsync         | 3.563 ms | 4.8485 ms | 1.2591 ms | 0.3333 |   1.37 KB |
+| Get              | 1.658 ms | 0.8554 ms | 0.1324 ms | 1.3333 |    5.5 KB |
+| GetAsync         | 1.629 ms | 0.6102 ms | 0.1585 ms | 1.3333 |   5.77 KB |
+
+> [!Warning]
+> - Doesn't implement `IBufferDistributedCache`.
+> - Doesn't enforce a disk usage limit or maximum cache size.
+
+### [LiteDb.Extensions.Caching](https://www.nuget.org/packages/LiteDb.Extensions.Caching)
+| Method           | Mean      | Error      | StdDev    | Median    | Gen0    | Gen1   | Allocated |
+|----------------- |----------:|-----------:|----------:|----------:|--------:|-------:|----------:|
+| Set              | 3.9888 ms | 11.0469 ms | 2.8689 ms | 2.0319 ms | 16.3333 | 4.0000 |  70.72 KB |
+| SetAsync         | 1.8872 ms |  1.6183 ms | 0.2504 ms | 1.9066 ms | 16.3333 | 2.3333 |  69.62 KB |
+| Get              | 0.0304 ms |  0.0045 ms | 0.0007 ms | 0.0303 ms |  7.3333 | 0.6667 |  30.28 KB |
+| GetAsync         | 0.0216 ms |  0.0180 ms | 0.0047 ms | 0.0183 ms |  5.0000 |      - |  20.61 KB |
+
+> [!Warning]
+> - Doesn't implement `IBufferDistributedCache`.
+> - Doesn't enforce a disk usage limit or maximum cache size.
+
+### [Caching.FileBackedDistributedCache](https://www.nuget.org/packages/Caching.FileBackedDistributedCache)
+| Method           | Mean      | Error     | StdDev    | Gen0   | Gen1   | Allocated |
+|----------------- |----------:|----------:|----------:|-------:|-------:|----------:|
+| Set              | 0.2634 ms | 0.1248 ms | 0.0193 ms | 2.0000 | 0.3333 |   8.39 KB |
+| SetAsync         | 0.2766 ms | 0.2580 ms | 0.0399 ms | 2.6667 | 0.6667 |   9.46 KB |
+| Get              | 0.0716 ms | 0.0092 ms | 0.0024 ms | 3.6667 | 0.3333 |  11.86 KB |
+| GetAsync         | 0.0818 ms | 0.0101 ms | 0.0026 ms | 3.6667 | 0.3333 |  13.08 KB |
+
+> [!Warning]
+> - Doesn't implement `IBufferDistributedCache`.
+> - Doesn't enforce a disk usage limit or maximum cache size.
+> - Expired entries are treated as cache misses but their files are not automatically deleted, so disk usage can grow indefinitely.
+> - Doesn't implement automatic background eviction or cleanup of expired entries.
 
 ### [Net.DistributedFileStoreCache](https://www.nuget.org/packages/Net.DistributedFileStoreCache)
 

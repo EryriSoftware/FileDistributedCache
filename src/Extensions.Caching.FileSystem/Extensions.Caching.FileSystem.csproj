@@ -9,7 +9,7 @@
 		<VerifyReferenceTrimCompatibility>true</VerifyReferenceTrimCompatibility>
 
 		<!-- NuGet Package Metadata -->
-		<Version>1.0.5</Version>
+		<Version>1.0.8</Version>
 		<PackageId>Eryri.FileDistributedCache</PackageId>
 		<Authors>Osian Linton</Authors>
 		<Description>High performance disposable cache, using local disk for more capacity without allocating more RAM or running a cache service. A single-process, filesystem-backed IDistributedCache and IBufferDistributedCache with expiration and automatic byte-limit eviction. Not shared or durable.</Description>
@@ -30,9 +30,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Eryri.WriteAheadLog" />
 		<PackageReference Include="Microsoft.Extensions.Caching.Abstractions" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
 		<PackageReference Include="Microsoft.Extensions.Options" />
+		<PackageReference Include="System.IO.Hashing" />
 	</ItemGroup>
 
 </Project>

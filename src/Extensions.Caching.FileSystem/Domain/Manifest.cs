@@ -1,15 +1,18 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using Eryri.Extensions.Caching.FileSystem.Models;
+using Microsoft.Extensions.Options;
 
 namespace Eryri.Extensions.Caching.FileSystem.Domain;
 
-internal class FileCacheManifest(EvictionPolicy policy)
+internal class Manifest(IOptions<FileCacheOptions> options)
 {
+    private readonly EvictionPolicy policy = options.Value.EvictionPolicy;
     private long _size;
     public long Size => Volatile.Read(ref _size);
     public int Count => files.Count;
-    private readonly ConcurrentDictionary<string, FileCacheMetadata> files = new (StringComparer.OrdinalIgnoreCase);
+    public ICollection<Metadata> Values => files.Values;
+    private readonly ConcurrentDictionary<string, Metadata> files = new (StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentPriorityQueue<PriorityCandidate, SequencedValue<long>> lruQueue = new ();
     private readonly ConcurrentPriorityQueue<PriorityCandidate, ulong> lfuQueue = new ();
     private readonly ConcurrentPriorityQueue<PriorityCandidate, long> ttlQueue = new ();
@@ -25,8 +28,8 @@ internal class FileCacheManifest(EvictionPolicy policy)
         fifoQueue.Clear();
     }
 
-    public bool TryGetValue(string key, [NotNullWhen(true)] out FileCacheMetadata? value) => files.TryGetValue(key, out value);
-    public bool TryUpdate(string key, FileCacheMetadata newValue, FileCacheMetadata comparisonValue)
+    public bool TryGetValue(string key, [NotNullWhen(true)] out Metadata? value) => files.TryGetValue(key, out value);
+    public bool TryUpdate(string key, Metadata newValue, Metadata comparisonValue)
     {
         newValue = newValue with
         {
@@ -42,7 +45,7 @@ internal class FileCacheManifest(EvictionPolicy policy)
         return false;
     }
 
-    public bool TryRemove(string key, [MaybeNullWhen(false)] out FileCacheMetadata value)
+    public bool TryRemove(string key, [MaybeNullWhen(false)] out Metadata value)
     {
         if (files.TryRemove(key, out value))
         {
@@ -53,20 +56,20 @@ internal class FileCacheManifest(EvictionPolicy policy)
         return false;
     }
 
-    public bool TryRemove(KeyValuePair<string, FileCacheMetadata> value)
+    public bool TryRemove(Metadata value)
     {
-        if (files.TryRemove(value))
+        if (files.TryRemove(new KeyValuePair<string, Metadata>(value.Key, value)))
         {
-            Interlocked.Add(ref _size, -value.Value.SizeBytes);
+            Interlocked.Add(ref _size, -value.SizeBytes);
             return true;
         }
 
         return false;
     }
 
-    public bool TryAdd(string key, FileCacheMetadata value)
+    public bool TryAdd(Metadata value)
     {
-        if (files.TryAdd(key, value))
+        if (files.TryAdd(value.Key, value))
         {
             Enqueue(value, null);
             Interlocked.Add(ref _size, value.SizeBytes);
@@ -76,7 +79,23 @@ internal class FileCacheManifest(EvictionPolicy policy)
         return false;
     }
 
-    private void Enqueue(FileCacheMetadata value, FileCacheMetadata? comparisonValue)
+    public bool AddOrReplace(Metadata value, [NotNullWhen(true)] out Metadata? existing)
+    {
+        while (true)
+        {
+            if (TryGetValue(value.Key, out existing)
+                && TryUpdate(value.Key, value, existing))
+            {
+                return true;
+            }
+            else if (TryAdd(value))
+            {
+                return false;
+            }
+        }
+    }
+
+    private void Enqueue(Metadata value, Metadata? comparisonValue)
     {
         var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
         if (value.ExpirationTicks.HasValue)
@@ -110,7 +129,7 @@ internal class FileCacheManifest(EvictionPolicy policy)
         }
     }
 
-    public void EnqueueTtl(FileCacheMetadata value)
+    public void EnqueueTtl(Metadata value)
     {
         if (value.ExpirationTicks.HasValue)
         {
@@ -129,7 +148,7 @@ internal class FileCacheManifest(EvictionPolicy policy)
             _ => throw new NotImplementedException(policy.ToString())
         };
 
-    private bool TryDequeue(EvictionPolicy policy, [NotNullWhen(true)] out FileCacheMetadata? value)
+    private bool TryDequeue(EvictionPolicy policy, [NotNullWhen(true)] out Metadata? value)
     {
         while (TryDequeueCandidate(policy, out var candidate))
         {
@@ -145,6 +164,6 @@ internal class FileCacheManifest(EvictionPolicy policy)
         return false;
     }
 
-    public bool TryDequeueTTL([NotNullWhen(true)] out FileCacheMetadata? value) => TryDequeue(EvictionPolicy.TTL, out value);
-    public bool TryDequeueEvictionPolicy([NotNullWhen(true)] out FileCacheMetadata? value) => TryDequeue(policy, out value);
+    public bool TryDequeueTTL([NotNullWhen(true)] out Metadata? value) => TryDequeue(EvictionPolicy.TTL, out value);
+    public bool TryDequeueEvictionPolicy([NotNullWhen(true)] out Metadata? value) => TryDequeue(policy, out value);
 }

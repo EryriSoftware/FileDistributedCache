@@ -63,4 +63,16 @@ public record FileCacheOptions
     /// Gets or sets the default Time To Live for items an absolute expiry set. Calculated from the time the item is added to the cache.
     /// </summary>
     public TimeSpan? DefaultAbsoluteExpirationRelativeToNow = null;
+
+    /// <summary>
+    /// Gets or sets the directory where cache files are stored.
+    /// Defaults to a tmp directory that's deleted when the application shuts down.
+    /// </summary>
+    public string? CacheDirectory { get; set; }
+
+    /// <summary>
+    /// Gets or sets the interval between compacting the Write Ahead Log into a snapshot.
+    /// A WAL is used to ensure minimal data loss. The snapshot speeds up recovery time.
+    /// </summary>
+    public TimeSpan SnapshotInterval { get; set; } = TimeSpan.FromMinutes(5);
 }
