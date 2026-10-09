@@ -130,10 +130,7 @@ internal class Manifest(IOptions<FileCacheOptions> options)
                 lruQueue.Enqueue(candidate, new SequencedValue<long>(value.LastAccessTicks));
                 break;
             case EvictionPolicy.LFU:
-                if (value.AccessCount != comparisonValue?.AccessCount)
-                {
-                    lfuQueue.Enqueue(candidate, value.AccessCount);
-                }
+                lfuQueue.Enqueue(candidate, value.AccessCount);
 
                 break;
             case EvictionPolicy.FIFO:

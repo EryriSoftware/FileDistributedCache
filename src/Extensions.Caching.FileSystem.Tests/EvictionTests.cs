@@ -134,7 +134,7 @@ internal class EvictionTests
 
         // Act
         ctx.Cache.Get("2").Should().NotBeNull();
-        ctx.Cache.Get("1").Should().NotBeNull();
+        ctx.Cache.Refresh("1"); // Increments Version and LastAccessTicks
         ctx.FileCache.Compact(0.5m);
 
         // Assert
@@ -148,19 +148,26 @@ internal class EvictionTests
         // Arrange
         using var ctx = new CacheContext(EvictionPolicy.LFU);
 
-        var options1 = new DistributedCacheEntryOptions { AbsoluteExpiration = ctx.Now.AddDays(1) };
-        var options2 = new DistributedCacheEntryOptions { AbsoluteExpiration = ctx.Now.AddDays(1) };
+        var options = new DistributedCacheEntryOptions
+        {
+            AbsoluteExpiration = ctx.Now.AddDays(1)
+        };
 
-        ctx.Cache.Set("1", Bytes(), options1);
-        ctx.Cache.Set("2", Bytes(), options2);
+        ctx.Cache.Set("1", Bytes(), options);
+        ctx.Cache.Set("2", Bytes(), options);
 
         // Act
         ctx.Cache.Get("2").Should().NotBeNull();
+        ctx.Cache.Refresh("1"); // Increments Version without changing AccessCount
+
         ctx.FileCache.Compact(0.5m);
 
         // Assert
-        ctx.Cache.Get("1").Should().BeNull(because: "LFU entry should be removed by Compact");
-        ctx.Cache.Get("2").Should().NotBeNull(because: "entry should remain");
+        ctx.Cache.Get("1").Should().BeNull(
+            because: "the least frequently used entry should be removed");
+
+        ctx.Cache.Get("2").Should().NotBeNull(
+            because: "the more frequently used entry should remain");
     }
 
     [Test]
