@@ -93,13 +93,13 @@ internal class WalPersistence : WriteAheadLog<Mutation>, IPersistence
         return mutation;
     }
 
-    public override ValueTask DisposeAsync()
+    public async override ValueTask DisposeAsync()
     {
         if (!IsDisposed)
         {
-            snapshotSchedule.DisposeAsync();
+            await snapshotSchedule.DisposeAsync();
         }
 
-        return base.DisposeAsync();
+        await base.DisposeAsync();
     }
 }

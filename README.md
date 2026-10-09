@@ -164,16 +164,16 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 > 1s == 1000ms, 1ms == 1000us, 1us == 1000ns
 
 ### [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
-| Method           | Mean      | Error     | StdDev    | Gen0   | Allocated |
-|----------------- |----------:|----------:|----------:|-------:|----------:|
-| Set              | 149.50 us | 111.98 us | 29.082 us |      - |    1126 B |
-| SetBuffered      | 213.69 us | 351.66 us | 91.325 us |      - |    1283 B |
-| SetAsync         | 164.47 us | 335.53 us | 51.924 us |      - |    1902 B |
-| SetBufferedAsync | 131.00 us |  39.80 us |  6.158 us | 0.3333 |    2229 B |
-| Get              |  66.14 us |  11.53 us |  2.995 us | 1.6667 |    4690 B |
-| GetBuffered      |  63.98 us |  21.33 us |  5.540 us |      - |     768 B |
-| GetAsync         |  69.59 us |  17.40 us |  4.518 us | 1.6667 |    5427 B |
-| GetBufferedAsync |  74.54 us |  24.62 us |  6.394 us | 0.3333 |    1676 B |
+| Method           | Mean      | Error      | StdDev    | Median    | Gen0   | Allocated |
+|----------------- |----------:|-----------:|----------:|----------:|-------:|----------:|
+| Set              | 138.74 us |  92.406 us | 14.300 us | 139.73 us |      - |    1139 B |
+| SetBuffered      | 178.57 us | 538.275 us | 83.299 us | 150.10 us |      - |    1311 B |
+| SetAsync         | 167.18 us | 499.066 us | 77.231 us | 130.37 us |      - |    1905 B |
+| SetBufferedAsync | 147.58 us | 125.371 us | 19.401 us | 140.60 us | 0.3333 |    2261 B |
+| Get              |  59.77 us |  17.320 us |  4.498 us |  59.67 us | 1.6667 |    4566 B |
+| GetBuffered      |  65.29 us |   9.898 us |  2.570 us |  65.25 us |      - |     636 B |
+| GetAsync         |  69.72 us |  12.847 us |  3.336 us |  69.56 us | 1.6667 |    5323 B |
+| GetBufferedAsync |  70.98 us |  18.614 us |  2.881 us |  71.16 us | 0.3333 |    1555 B |
 
 ### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
 | Method           | Mean       | Error       | StdDev    | Gen0   | Gen1   | Allocated |

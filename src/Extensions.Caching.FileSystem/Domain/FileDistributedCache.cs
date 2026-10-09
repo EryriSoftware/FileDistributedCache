@@ -29,7 +29,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         this.persistance = persistance;
         cacheDirectory = directoryOwner.Directory;
 
-        persistance.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
+        persistance.InitializeAsync(CancellationToken.None);
         RemoveExpired();
     }
 
@@ -214,7 +214,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         {
             if (manifest.TryUpdate(key, entry, timeProvider.GetUtcNow().UtcTicks, isAccessed, out var newEntry))
             {
-                persistance.Update(newEntry, CancellationToken.None).GetAwaiter().GetResult();
+                var _ = persistance.Update(newEntry, CancellationToken.None);
                 QueueCleanup(newEntry.ExpirationTicks);
                 return;
             }
@@ -234,7 +234,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         if (manifest.TryRemove(key, out var entry))
         {
-            persistance.Delete(entry, CancellationToken.None).GetAwaiter().GetResult();
+            var _ = persistance.Delete(entry, CancellationToken.None);
             TryDelete(entry.Path);
         }
     }
@@ -249,7 +249,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         if (manifest.TryRemove(entry))
         {
-            persistance.Delete(entry, CancellationToken.None).GetAwaiter().GetResult();
+            var _ = persistance.Delete(entry, CancellationToken.None);
             TryDelete(entry.Path);
             return true;
         }
@@ -322,7 +322,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             TryDelete(existing.Path);
         }
 
-        persistance.Insert(entry, CancellationToken.None).GetAwaiter().GetResult();
+        var _ = persistance.Insert(entry, CancellationToken.None);
         QueueCleanup(entry.ExpirationTicks);
     }
 
