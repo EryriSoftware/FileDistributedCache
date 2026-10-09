@@ -4,6 +4,7 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
+using Eryri.Buffers;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Perfolizer.Horology;
@@ -16,24 +17,18 @@ public class BenchmarkTests
     private static CancellationToken CancellationToken => TestContext.CurrentContext.CancellationToken;
     private IConfig config = ManualConfig
         .Create(DefaultConfig.Instance)
-        .WithSummaryStyle(
-            SummaryStyle.Default
-                .WithTimeUnit(TimeUnit.Millisecond));
+        .WithSummaryStyle(SummaryStyle.Default.WithTimeUnit(TimeUnit.Microsecond));
 
-    [Test]
-    public void Run_Eryri_FileDistributedCache_Tests() => BenchmarkRunner.Run<Eryri_FileDistributedCache_Tests>(config);
-    [Test]
-    public void Run_DamianH_FileDistributedCache_Tests() => BenchmarkRunner.Run<DamianH_FileDistributedCache_Tests>(config);
-    [Test]
-    public void Run_DNeoSmart_Caching_Sqlite_Tests() => BenchmarkRunner.Run<DNeoSmart_Caching_Sqlite_Tests>(config);
-    [Test]
-    public void Run_LiteDb_Extensions_Caching_Tests() => BenchmarkRunner.Run<LiteDb_Extensions_Caching_Tests>(config);
-    [Test]
-    public void Run_Caching_FileBackedDistributedCache_Tests() => BenchmarkRunner.Run<Caching_FileBackedDistributedCache_Tests>(config);
+    [TestCase(typeof(Eryri_FileDistributedCache_Benchmarks), TestName = "Eryri_FileDistributedCache")]
+    [TestCase(typeof(DamianH_FileDistributedCache_Benchmarks), TestName = "DamianH_FileDistributedCache")]
+    [TestCase(typeof(DNeoSmart_Caching_Sqlite_Benchmarks), TestName = "DNeoSmart_Caching_Sqlite")]
+    [TestCase(typeof(LiteDb_Extensions_Caching_Benchmarks), TestName = "LiteDb_Extensions_Caching")]
+    [TestCase(typeof(Caching_FileBackedDistributedCache_Benchmarks), TestName = "Caching_FileBackedDistributedCache")]
+    public void Run_Benchmark(Type benchmarkType) => BenchmarkRunner.Run(benchmarkType, config);
 
-    public class Eryri_FileDistributedCache_Tests : TestBase
+    public class Eryri_FileDistributedCache_Benchmarks : Benchmarks
     {
-        public Eryri_FileDistributedCache_Tests()
+        public Eryri_FileDistributedCache_Benchmarks()
         {
             services.AddDistributedFileCache(d =>
             {
@@ -43,9 +38,9 @@ public class BenchmarkTests
         }
     }
 
-    public class DamianH_FileDistributedCache_Tests : TestBase
+    public class DamianH_FileDistributedCache_Benchmarks : Benchmarks
     {
-        public DamianH_FileDistributedCache_Tests()
+        public DamianH_FileDistributedCache_Benchmarks()
         {
             FileDistributedCacheServiceCollectionExtensions.AddFileDistributedCache(services, d =>
             {
@@ -55,9 +50,9 @@ public class BenchmarkTests
         }
     }
 
-    public class DNeoSmart_Caching_Sqlite_Tests : TestBase
+    public class DNeoSmart_Caching_Sqlite_Benchmarks : Benchmarks
     {
-        public DNeoSmart_Caching_Sqlite_Tests()
+        public DNeoSmart_Caching_Sqlite_Benchmarks()
         {
             NeoSmart.Caching.Sqlite.AspSqliteCacheServiceCollectionExtensions.AddSqliteCache(services, d =>
             {
@@ -72,9 +67,9 @@ public class BenchmarkTests
         }
     }
 
-    public class LiteDb_Extensions_Caching_Tests : TestBase
+    public class LiteDb_Extensions_Caching_Benchmarks : Benchmarks
     {
-        public LiteDb_Extensions_Caching_Tests()
+        public LiteDb_Extensions_Caching_Benchmarks()
         {
             LiteDb.Extensions.Caching.ServiceCollectionExtensions.AddLiteDbCache(services, d =>
             {
@@ -83,9 +78,9 @@ public class BenchmarkTests
         }
     }
 
-    public class Caching_FileBackedDistributedCache_Tests : TestBase
+    public class Caching_FileBackedDistributedCache_Benchmarks : Benchmarks
     {
-        public Caching_FileBackedDistributedCache_Tests()
+        public Caching_FileBackedDistributedCache_Benchmarks()
         {
             FileBackedCache.Extensions.AddFileBackedCache(services, cacheDirectory.FullName);
         }
@@ -96,7 +91,7 @@ public class BenchmarkTests
         warmupCount: 1,
         iterationCount: 5,
         invocationCount: 30)]
-    public abstract class TestBase : IDisposable
+    public abstract class Benchmarks : IDisposable
     {
         public const int ParallelOperations = 100;
         public const int NumberOfItemsUntilFull = SizeLimit / PayloadSize;
@@ -204,7 +199,7 @@ public class BenchmarkTests
         {
             Parallel.For(0, ParallelOperations, i =>
             {
-                var buffer = new ArrayBufferWriter<byte>(payload.Length);
+                using var buffer = new ArrayPoolBufferWriter<byte>(payload.Length);
                 if (!bufferedCache!.TryGet(key, buffer))
                 {
                     bufferedCache!.Set(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
@@ -229,7 +224,7 @@ public class BenchmarkTests
         {
             await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (i, ct) =>
             {
-                var buffer = new ArrayBufferWriter<byte>(payload.Length);
+                using var buffer = new ArrayPoolBufferWriter<byte>(payload.Length);
                 if (!await bufferedCache!.TryGetAsync(key, buffer, ct))
                 {
                     await bufferedCache!.SetAsync(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions, ct);

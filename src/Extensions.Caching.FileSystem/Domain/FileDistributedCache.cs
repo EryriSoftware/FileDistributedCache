@@ -33,7 +33,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         RemoveExpired();
     }
 
-    private readonly ConcurrentDictionary<string, Lazy<DirectoryInfo>> directories = new (StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, Lazy<string>> directories = new (StringComparer.OrdinalIgnoreCase);
     private bool isDisposed = false;
     private readonly ILogger? logger;
     private readonly FileCacheOptions settings;
@@ -212,13 +212,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         while (manifest.TryGetValue(key, out var entry))
         {
-            var newEntry = entry with
-            {
-                LastAccessTicks = timeProvider.GetUtcNow().UtcTicks,
-                AccessCount = isAccessed ? entry.AccessCount + 1 : entry.AccessCount
-            };
-
-            if (manifest.TryUpdate(key, newEntry, entry))
+            if (manifest.TryUpdate(key, entry, timeProvider.GetUtcNow().UtcTicks, isAccessed, out var newEntry))
             {
                 persistance.Update(newEntry, CancellationToken.None).GetAwaiter().GetResult();
                 QueueCleanup(newEntry.ExpirationTicks);
@@ -296,13 +290,13 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     private Metadata CreateFileEntry(string key, long payloadSize, DistributedCacheEntryOptions options)
     {
-        var id = Guid.NewGuid().ToString("N");
+        var id = $"{Guid.NewGuid():N}.bytes";
         var shard = id[..ShardingDepth()];
         var now = timeProvider.GetUtcNow().UtcTicks;
-        var path = Path.Combine(cacheDirectory.FullName, shard, $"{id}.bytes");
-        var directory = directories
-            .GetOrAdd(shard, static (shard, root) => new Lazy<DirectoryInfo>(() => Directory.CreateDirectory(Path.Combine(root.FullName, shard))), cacheDirectory)
+        var shardDirectory = directories
+            .GetOrAdd(shard, static (shard, root) => new Lazy<string>(() => Directory.CreateDirectory(Path.Combine(root, shard)).FullName), cacheDirectory.FullName)
             .Value; // Ensure the directory is created before writing the file
+        var path = Path.Combine(shardDirectory, id);
         return new Metadata(
             Key: key,
             Path: path,

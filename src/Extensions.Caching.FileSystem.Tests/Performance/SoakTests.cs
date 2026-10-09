@@ -1,5 +1,6 @@
 ﻿using System.Buffers;
 using System.Security.Cryptography;
+using Eryri.Buffers;
 using Eryri.Extensions.Caching.FileSystem.Tests.Contexts;
 using Microsoft.Extensions.Caching.Distributed;
 
@@ -37,7 +38,8 @@ public class SoakTests
             ctx.BufferCache.Set(key, new ReadOnlySequence<byte>(Payload), options);
 
             ctx.Cache.Get(key);
-            ctx.BufferCache.TryGet(key, new ArrayBufferWriter<byte>());
+            using var buffer = new ArrayPoolBufferWriter<byte>(Payload.Length);
+            ctx.BufferCache.TryGet(key, buffer);
         });
     }
 
@@ -66,9 +68,10 @@ public class SoakTests
                 ctx.BufferCache.SetAsync(key, new ReadOnlySequence<byte>(Payload), options, ct).AsTask()
             ]);
 
+            using var buffer = new ArrayPoolBufferWriter<byte>(Payload.Length);
             await Task.WhenAll([
                 ctx.Cache.GetAsync(key, ct),
-                ctx.BufferCache.TryGetAsync(key, new ArrayBufferWriter<byte>(), ct).AsTask()
+                ctx.BufferCache.TryGetAsync(key, buffer, ct).AsTask()
             ]);
         });
     }

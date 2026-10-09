@@ -164,28 +164,28 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 > 1s == 1000ms, 1ms == 1000us, 1us == 1000ns
 
 ### [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
-| Method           | Mean      | Error     | StdDev    | Median    | Gen0   | Gen1   | Allocated |
-|----------------- |----------:|----------:|----------:|----------:|-------:|-------:|----------:|
-| Set              | 0.1399 ms | 0.2792 ms | 0.0432 ms | 0.1199 ms |      - |      - |    1.2 KB |
-| SetBuffered      | 0.1834 ms | 0.6407 ms | 0.0992 ms | 0.1356 ms |      - |      - |   1.36 KB |
-| SetAsync         | 0.1779 ms | 0.5594 ms | 0.0866 ms | 0.1426 ms |      - |      - |   1.93 KB |
-| SetBufferedAsync | 0.1795 ms | 0.5731 ms | 0.0887 ms | 0.1407 ms | 0.3333 |      - |   2.27 KB |
-| Get              | 0.0610 ms | 0.0257 ms | 0.0067 ms | 0.0655 ms | 1.6667 |      - |   4.58 KB |
-| GetBuffered      | 0.0662 ms | 0.0075 ms | 0.0019 ms | 0.0672 ms | 3.6667 | 0.6667 |  12.79 KB |
-| GetAsync         | 0.0736 ms | 0.0111 ms | 0.0029 ms | 0.0742 ms | 1.6667 |      - |   5.32 KB |
-| GetBufferedAsync | 0.0698 ms | 0.0121 ms | 0.0031 ms | 0.0678 ms | 4.0000 | 0.6667 |  13.68 KB |
+| Method           | Mean      | Error     | StdDev    | Gen0   | Allocated |
+|----------------- |----------:|----------:|----------:|-------:|----------:|
+| Set              | 149.50 us | 111.98 us | 29.082 us |      - |    1126 B |
+| SetBuffered      | 213.69 us | 351.66 us | 91.325 us |      - |    1283 B |
+| SetAsync         | 164.47 us | 335.53 us | 51.924 us |      - |    1902 B |
+| SetBufferedAsync | 131.00 us |  39.80 us |  6.158 us | 0.3333 |    2229 B |
+| Get              |  66.14 us |  11.53 us |  2.995 us | 1.6667 |    4690 B |
+| GetBuffered      |  63.98 us |  21.33 us |  5.540 us |      - |     768 B |
+| GetAsync         |  69.59 us |  17.40 us |  4.518 us | 1.6667 |    5427 B |
+| GetBufferedAsync |  74.54 us |  24.62 us |  6.394 us | 0.3333 |    1676 B |
 
 ### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
-| Method           | Mean      | Error     | StdDev    | Median    | Gen0   | Gen1   | Allocated |
-|----------------- |----------:|----------:|----------:|----------:|-------:|-------:|----------:|
-| Set              | 1.5264 ms | 4.3231 ms | 1.1227 ms | 1.0749 ms | 2.0000 | 0.3333 |   7.56 KB |
-| SetBuffered      | 1.0781 ms | 1.9726 ms | 0.5123 ms | 0.9659 ms | 1.6667 | 0.3333 |   7.56 KB |
-| SetAsync         | 2.1514 ms | 6.6831 ms | 1.7356 ms | 1.5289 ms | 1.3333 |      - |   7.31 KB |
-| SetBufferedAsync | 1.1642 ms | 2.5317 ms | 0.6575 ms | 1.2555 ms | 1.3333 | 0.3333 |   7.31 KB |
-| Get              | 0.1244 ms | 0.0229 ms | 0.0035 ms | 0.1242 ms | 4.6667 | 0.3333 |  13.28 KB |
-| GetBuffered      | 0.1472 ms | 0.0471 ms | 0.0122 ms | 0.1441 ms | 4.3333 | 1.3333 |  13.32 KB |
-| GetAsync         | 0.1820 ms | 0.0325 ms | 0.0084 ms | 0.1776 ms | 4.6667 | 1.0000 |  15.12 KB |
-| GetBufferedAsync | 0.1738 ms | 0.0126 ms | 0.0019 ms | 0.1737 ms | 4.6667 | 1.0000 |  15.19 KB |
+| Method           | Mean       | Error       | StdDev    | Gen0   | Gen1   | Allocated |
+|----------------- |-----------:|------------:|----------:|-------:|-------:|----------:|
+| Set              |   800.3 us | 1,370.08 us | 355.81 us | 2.0000 | 0.6667 |   7.59 KB |
+| SetBuffered      |   705.4 us | 1,962.94 us | 303.77 us | 2.0000 | 0.6667 |   7.54 KB |
+| SetAsync         |   713.3 us | 1,696.50 us | 262.54 us | 1.3333 | 0.3333 |   7.27 KB |
+| SetBufferedAsync | 1,394.2 us | 2,729.99 us | 708.97 us | 1.3333 | 0.3333 |    7.3 KB |
+| Get              |   145.0 us |    29.58 us |   7.68 us | 4.6667 |      - |  13.28 KB |
+| GetBuffered      |   139.2 us |    38.01 us |   9.87 us | 3.0000 | 0.6667 |   9.28 KB |
+| GetAsync         |   174.3 us |     9.25 us |   1.43 us | 4.6667 | 1.0000 |  15.13 KB |
+| GetBufferedAsync |   171.0 us |    10.42 us |   1.61 us | 2.6667 | 0.3333 |  11.17 KB |
 
 > [!Warning]
 > - Size limits are eventual, not strict.
@@ -193,36 +193,36 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 > - Eviction only acts on its periodic scan. LRU policy only.
 
 ### [NeoSmart.Caching.Sqlite](https://www.nuget.org/packages/NeoSmart.Caching.Sqlite)
-| Method           | Mean     | Error     | StdDev    | Gen0   | Allocated |
-|----------------- |---------:|----------:|----------:|-------:|----------:|
-| Set              | 4.201 ms | 5.1480 ms | 1.3369 ms | 0.3333 |   1.59 KB |
-| SetAsync         | 3.563 ms | 4.8485 ms | 1.2591 ms | 0.3333 |   1.37 KB |
-| Get              | 1.658 ms | 0.8554 ms | 0.1324 ms | 1.3333 |    5.5 KB |
-| GetAsync         | 1.629 ms | 0.6102 ms | 0.1585 ms | 1.3333 |   5.77 KB |
+| Method           | Mean       | Error      | StdDev     | Gen0   | Gen1   | Allocated |
+|----------------- |-----------:|-----------:|-----------:|-------:|-------:|----------:|
+| Set              | 2,866.5 us | 4,975.1 us | 1,292.0 us | 0.3333 |      - |   1.53 KB |
+| SetAsync         | 2,290.8 us | 2,441.2 us |   634.0 us | 0.3333 |      - |   1.37 KB |
+| Get              | 1,753.1 us |   523.9 us |   136.1 us | 1.3333 | 0.3333 |   5.52 KB |
+| GetAsync         | 1,500.5 us |   424.8 us |   110.3 us | 1.3333 |      - |   5.77 KB |
 
 > [!Warning]
 > - Doesn't implement `IBufferDistributedCache`.
 > - Doesn't enforce a disk usage limit or maximum cache size.
 
 ### [LiteDb.Extensions.Caching](https://www.nuget.org/packages/LiteDb.Extensions.Caching)
-| Method           | Mean      | Error      | StdDev    | Median    | Gen0    | Gen1   | Allocated |
-|----------------- |----------:|-----------:|----------:|----------:|--------:|-------:|----------:|
-| Set              | 3.9888 ms | 11.0469 ms | 2.8689 ms | 2.0319 ms | 16.3333 | 4.0000 |  70.72 KB |
-| SetAsync         | 1.8872 ms |  1.6183 ms | 0.2504 ms | 1.9066 ms | 16.3333 | 2.3333 |  69.62 KB |
-| Get              | 0.0304 ms |  0.0045 ms | 0.0007 ms | 0.0303 ms |  7.3333 | 0.6667 |  30.28 KB |
-| GetAsync         | 0.0216 ms |  0.0180 ms | 0.0047 ms | 0.0183 ms |  5.0000 |      - |  20.61 KB |
+| Method           | Mean        | Error        | StdDev     | Gen0    | Gen1   | Allocated |
+|----------------- |------------:|-------------:|-----------:|--------:|-------:|----------:|
+| Set              | 2,601.81 us |   765.681 us | 198.845 us | 15.3333 | 1.3333 |  64.49 KB |
+| SetAsync         | 1,859.92 us | 4,618.719 us | 714.752 us | 15.6667 | 2.3333 |  67.65 KB |
+| Get              |    19.57 us |     3.071 us |   0.475 us |  5.6667 | 0.6667 |  23.74 KB |
+| GetAsync         |    18.38 us |     2.176 us |   0.565 us |  6.0000 | 0.6667 |  24.58 KB |
 
 > [!Warning]
 > - Doesn't implement `IBufferDistributedCache`.
 > - Doesn't enforce a disk usage limit or maximum cache size.
 
 ### [Caching.FileBackedDistributedCache](https://www.nuget.org/packages/Caching.FileBackedDistributedCache)
-| Method           | Mean      | Error     | StdDev    | Gen0   | Gen1   | Allocated |
-|----------------- |----------:|----------:|----------:|-------:|-------:|----------:|
-| Set              | 0.2634 ms | 0.1248 ms | 0.0193 ms | 2.0000 | 0.3333 |   8.39 KB |
-| SetAsync         | 0.2766 ms | 0.2580 ms | 0.0399 ms | 2.6667 | 0.6667 |   9.46 KB |
-| Get              | 0.0716 ms | 0.0092 ms | 0.0024 ms | 3.6667 | 0.3333 |  11.86 KB |
-| GetAsync         | 0.0818 ms | 0.0101 ms | 0.0026 ms | 3.6667 | 0.3333 |  13.08 KB |
+| Method           | Mean      | Error        | StdDev     | Gen0   | Gen1   | Allocated |
+|----------------- |----------:|-------------:|-----------:|-------:|-------:|----------:|
+| Set              | 763.84 us | 3,096.366 us | 479.166 us | 2.0000 | 0.3333 |   8.41 KB |
+| SetAsync         | 631.92 us | 1,329.146 us | 345.175 us | 2.6667 |      - |   9.46 KB |
+| Get              |  71.58 us |     7.238 us |   1.880 us | 3.6667 | 0.3333 |  11.85 KB |
+| GetAsync         |  81.93 us |    12.656 us |   3.287 us | 3.6667 | 0.6667 |  13.08 KB |
 
 > [!Warning]
 > - Doesn't implement `IBufferDistributedCache`.

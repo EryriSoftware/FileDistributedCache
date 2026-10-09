@@ -25,7 +25,13 @@ internal static class BufferWriterFileExtensions
 
         public void ReadFile(string path)
         {
-            using var file = File.OpenRead(path);
+            using var file = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: BufferSize,
+                options: FileOptions.SequentialScan);
 
             for (int read = 0; (read = file.Read(writer.GetSpan(BufferSize))) > 0; writer.Advance(read))
             { }
