@@ -29,11 +29,11 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         this.persistance = persistance;
         cacheDirectory = directoryOwner.Directory;
 
-        persistance.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
+        persistance.InitializeAsync(CancellationToken.None);
         RemoveExpired();
     }
 
-    private readonly ConcurrentDictionary<string, Lazy<DirectoryInfo>> directories = new (StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, Lazy<string>> directories = new (StringComparer.OrdinalIgnoreCase);
     private bool isDisposed = false;
     private readonly ILogger? logger;
     private readonly FileCacheOptions settings;
@@ -212,15 +212,9 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         while (manifest.TryGetValue(key, out var entry))
         {
-            var newEntry = entry with
+            if (manifest.TryUpdate(key, entry, timeProvider.GetUtcNow().UtcTicks, isAccessed, out var newEntry))
             {
-                LastAccessTicks = timeProvider.GetUtcNow().UtcTicks,
-                AccessCount = isAccessed ? entry.AccessCount + 1 : entry.AccessCount
-            };
-
-            if (manifest.TryUpdate(key, newEntry, entry))
-            {
-                persistance.Update(newEntry, CancellationToken.None).GetAwaiter().GetResult();
+                var _ = persistance.Update(newEntry, CancellationToken.None);
                 QueueCleanup(newEntry.ExpirationTicks);
                 return;
             }
@@ -240,7 +234,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         if (manifest.TryRemove(key, out var entry))
         {
-            persistance.Delete(entry, CancellationToken.None).GetAwaiter().GetResult();
+            var _ = persistance.Delete(entry, CancellationToken.None);
             TryDelete(entry.Path);
         }
     }
@@ -255,7 +249,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         if (manifest.TryRemove(entry))
         {
-            persistance.Delete(entry, CancellationToken.None).GetAwaiter().GetResult();
+            var _ = persistance.Delete(entry, CancellationToken.None);
             TryDelete(entry.Path);
             return true;
         }
@@ -296,13 +290,13 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     private Metadata CreateFileEntry(string key, long payloadSize, DistributedCacheEntryOptions options)
     {
-        var id = Guid.NewGuid().ToString("N");
+        var id = $"{Guid.NewGuid():N}.bytes";
         var shard = id[..ShardingDepth()];
         var now = timeProvider.GetUtcNow().UtcTicks;
-        var path = Path.Combine(cacheDirectory.FullName, shard, $"{id}.bytes");
-        var directory = directories
-            .GetOrAdd(shard, static (shard, root) => new Lazy<DirectoryInfo>(() => Directory.CreateDirectory(Path.Combine(root.FullName, shard))), cacheDirectory)
+        var shardDirectory = directories
+            .GetOrAdd(shard, static (shard, root) => new Lazy<string>(() => Directory.CreateDirectory(Path.Combine(root, shard)).FullName), cacheDirectory.FullName)
             .Value; // Ensure the directory is created before writing the file
+        var path = Path.Combine(shardDirectory, id);
         return new Metadata(
             Key: key,
             Path: path,
@@ -328,7 +322,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             TryDelete(existing.Path);
         }
 
-        persistance.Insert(entry, CancellationToken.None).GetAwaiter().GetResult();
+        var _ = persistance.Insert(entry, CancellationToken.None);
         QueueCleanup(entry.ExpirationTicks);
     }
 

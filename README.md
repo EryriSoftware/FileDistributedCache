@@ -18,6 +18,7 @@ Use it directly when local disk is the right cache, or register it as the second
 > [!IMPORTANT]
 > **Local, single-process.** `IDistributedCache` is the interface this package implements, not a promise of distributed storage. Each process should have its own cache; do not use this provider when replicas must share entries.
 
+--- 
 ## Why use it?
 
 - **Keep RAM for your application.** Store reusable payloads in files rather than retaining the whole disk-backed cache in memory. A local filesystem is useful when your reusable working set is larger than the memory budget you want to assign to caching.
@@ -28,6 +29,7 @@ Use it directly when local disk is the right cache, or register it as the second
 
 **Good fit:** a single-process service or worker with reproducible cache values and useful local disk space. **Not a fit:** cross-replica consistency. The cache's configured byte limit controls its own entries; it does not reserve free space for other applications.
 
+---
 ## Scope at a glance
 
 | Requirement | This package |
@@ -40,6 +42,7 @@ Use it directly when local disk is the right cache, or register it as the second
 | Cache persistence across restarts | Yes; If a persistent Cache Directory is supplied |
 | Automatic RAM-pressure-triggered spill | No; use as a disk-backed tier, not as an automatic memory overflow mechanism |
 
+---
 ## Install and get started
 
 The NuGet package ID is `Eryri.FileDistributedCache`.
@@ -93,7 +96,6 @@ var options = new HybridCacheEntryOptions
 {
     Expiration = TimeSpan.FromMinutes(10),
     LocalCacheExpiration = TimeSpan.FromSeconds(5), // Keep in-memory items for only a short period
-    Flags = HybridCacheEntryFlags.DisableLocalCache // Disables the 'IMemoryCache' for the purpose of thie example
 };
 
 await cache.SetAsync("product:42", "Cached product data", options);
@@ -108,6 +110,7 @@ Console.WriteLine(value);
 
 Both tiers remain local to this process. For a shared secondary cache across replicas, use a backend designed for sharing.
 
+---
 ## Expiration and capacity
 
 Set a byte-based size limit if you want the cache to control its footprint. When a new entry would exceed that limit, the cache evicts existing entries as needed *before* adding it. The configured eviction policy determines which eligible entries are selected. Expired entries are also removed automatically by a background timer scheduled for the next expiry.
@@ -141,6 +144,7 @@ For manual capacity reduction, `IFileDistributedCache.Compact(decimal percentage
 | `CacheDirectory` | The persistent directory for cache files. No value indicates an ephemeral tmp directory should be used which will be deleted during normal shutdown. |
 | `SnapshotInterval` | If a persistent directory is supplied, determines how often the Write Ahead Log is compacted into a snapshot. |
 
+---
 ## Operational boundaries
 
 - **One process owns one cache.** Do not share the cache directory or assume another process can observe its entries safely.
@@ -148,6 +152,7 @@ For manual capacity reduction, `IFileDistributedCache.Compact(decimal percentage
 - **Filesystem access matters.** The process needs permission to create, read, write, and delete files in its cache directory. A configured cache-size limit does not protect against another workload filling the underlying filesystem.
 - **Write failures:** If the filesystem rejects a write, the entry is not added and an error is logged. Callers should not treat `Set` as proof that the entry can later be read back.
 
+---
 ## Benchmarks
 
 The benchmark that matters most for this package is **sustained operation with realistic workloads while the cache is already full**: this tests the cost of making room, not just writing into an empty directory. The figures below are useful directional evidence, not a cross-machine performance guarantee.
@@ -164,75 +169,75 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 > 1s == 1000ms, 1ms == 1000us, 1us == 1000ns
 
 ### [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
-| Method           | Mean      | Error     | StdDev    | Median    | Gen0   | Gen1   | Allocated |
-|----------------- |----------:|----------:|----------:|----------:|-------:|-------:|----------:|
-| Set              | 0.1399 ms | 0.2792 ms | 0.0432 ms | 0.1199 ms |      - |      - |    1.2 KB |
-| SetBuffered      | 0.1834 ms | 0.6407 ms | 0.0992 ms | 0.1356 ms |      - |      - |   1.36 KB |
-| SetAsync         | 0.1779 ms | 0.5594 ms | 0.0866 ms | 0.1426 ms |      - |      - |   1.93 KB |
-| SetBufferedAsync | 0.1795 ms | 0.5731 ms | 0.0887 ms | 0.1407 ms | 0.3333 |      - |   2.27 KB |
-| Get              | 0.0610 ms | 0.0257 ms | 0.0067 ms | 0.0655 ms | 1.6667 |      - |   4.58 KB |
-| GetBuffered      | 0.0662 ms | 0.0075 ms | 0.0019 ms | 0.0672 ms | 3.6667 | 0.6667 |  12.79 KB |
-| GetAsync         | 0.0736 ms | 0.0111 ms | 0.0029 ms | 0.0742 ms | 1.6667 |      - |   5.32 KB |
-| GetBufferedAsync | 0.0698 ms | 0.0121 ms | 0.0031 ms | 0.0678 ms | 4.0000 | 0.6667 |  13.68 KB |
+| Method           | Mean      | Error      | StdDev    | Median    | Gen0   | Allocated |
+|----------------- |----------:|-----------:|----------:|----------:|-------:|----------:|
+| Set              | 138.74 us |  92.406 us | 14.300 us | 139.73 us |      - |    1139 B |
+| SetBuffered      | 178.57 us | 538.275 us | 83.299 us | 150.10 us |      - |    1311 B |
+| SetAsync         | 167.18 us | 499.066 us | 77.231 us | 130.37 us |      - |    1905 B |
+| SetBufferedAsync | 147.58 us | 125.371 us | 19.401 us | 140.60 us | 0.3333 |    2261 B |
+| Get              |  59.77 us |  17.320 us |  4.498 us |  59.67 us | 1.6667 |    4566 B |
+| GetBuffered      |  65.29 us |   9.898 us |  2.570 us |  65.25 us |      - |     636 B |
+| GetAsync         |  69.72 us |  12.847 us |  3.336 us |  69.56 us | 1.6667 |    5323 B |
+| GetBufferedAsync |  70.98 us |  18.614 us |  2.881 us |  71.16 us | 0.3333 |    1555 B |
 
 ### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
-| Method           | Mean      | Error     | StdDev    | Median    | Gen0   | Gen1   | Allocated |
-|----------------- |----------:|----------:|----------:|----------:|-------:|-------:|----------:|
-| Set              | 1.5264 ms | 4.3231 ms | 1.1227 ms | 1.0749 ms | 2.0000 | 0.3333 |   7.56 KB |
-| SetBuffered      | 1.0781 ms | 1.9726 ms | 0.5123 ms | 0.9659 ms | 1.6667 | 0.3333 |   7.56 KB |
-| SetAsync         | 2.1514 ms | 6.6831 ms | 1.7356 ms | 1.5289 ms | 1.3333 |      - |   7.31 KB |
-| SetBufferedAsync | 1.1642 ms | 2.5317 ms | 0.6575 ms | 1.2555 ms | 1.3333 | 0.3333 |   7.31 KB |
-| Get              | 0.1244 ms | 0.0229 ms | 0.0035 ms | 0.1242 ms | 4.6667 | 0.3333 |  13.28 KB |
-| GetBuffered      | 0.1472 ms | 0.0471 ms | 0.0122 ms | 0.1441 ms | 4.3333 | 1.3333 |  13.32 KB |
-| GetAsync         | 0.1820 ms | 0.0325 ms | 0.0084 ms | 0.1776 ms | 4.6667 | 1.0000 |  15.12 KB |
-| GetBufferedAsync | 0.1738 ms | 0.0126 ms | 0.0019 ms | 0.1737 ms | 4.6667 | 1.0000 |  15.19 KB |
+| Method           | Mean       | Error       | StdDev    | Gen0   | Gen1   | Allocated |
+|----------------- |-----------:|------------:|----------:|-------:|-------:|----------:|
+| Set              |   800.3 us | 1,370.08 us | 355.81 us | 2.0000 | 0.6667 |   7.59 KB |
+| SetBuffered      |   705.4 us | 1,962.94 us | 303.77 us | 2.0000 | 0.6667 |   7.54 KB |
+| SetAsync         |   713.3 us | 1,696.50 us | 262.54 us | 1.3333 | 0.3333 |   7.27 KB |
+| SetBufferedAsync | 1,394.2 us | 2,729.99 us | 708.97 us | 1.3333 | 0.3333 |    7.3 KB |
+| Get              |   145.0 us |    29.58 us |   7.68 us | 4.6667 |      - |  13.28 KB |
+| GetBuffered      |   139.2 us |    38.01 us |   9.87 us | 3.0000 | 0.6667 |   9.28 KB |
+| GetAsync         |   174.3 us |     9.25 us |   1.43 us | 4.6667 | 1.0000 |  15.13 KB |
+| GetBufferedAsync |   171.0 us |    10.42 us |   1.61 us | 2.6667 | 0.3333 |  11.17 KB |
 
 > [!Warning]
-> - Size limits are eventual, not strict.
-> - Write methods publishes without checking MaxTotalSize or MaxEntries
-> - Eviction only acts on its periodic scan. LRU policy only.
+> - Capacity enforcement is eventual rather than strict.
+> - Write operations do not check MaxTotalSize or MaxEntries before publishing entries.
+> - Eviction is performed by a periodic scan; LRU is the supported policy in the reviewed implementation.
 
 ### [NeoSmart.Caching.Sqlite](https://www.nuget.org/packages/NeoSmart.Caching.Sqlite)
-| Method           | Mean     | Error     | StdDev    | Gen0   | Allocated |
-|----------------- |---------:|----------:|----------:|-------:|----------:|
-| Set              | 4.201 ms | 5.1480 ms | 1.3369 ms | 0.3333 |   1.59 KB |
-| SetAsync         | 3.563 ms | 4.8485 ms | 1.2591 ms | 0.3333 |   1.37 KB |
-| Get              | 1.658 ms | 0.8554 ms | 0.1324 ms | 1.3333 |    5.5 KB |
-| GetAsync         | 1.629 ms | 0.6102 ms | 0.1585 ms | 1.3333 |   5.77 KB |
+| Method           | Mean       | Error      | StdDev     | Gen0   | Gen1   | Allocated |
+|----------------- |-----------:|-----------:|-----------:|-------:|-------:|----------:|
+| Set              | 2,866.5 us | 4,975.1 us | 1,292.0 us | 0.3333 |      - |   1.53 KB |
+| SetAsync         | 2,290.8 us | 2,441.2 us |   634.0 us | 0.3333 |      - |   1.37 KB |
+| Get              | 1,753.1 us |   523.9 us |   136.1 us | 1.3333 | 0.3333 |   5.52 KB |
+| GetAsync         | 1,500.5 us |   424.8 us |   110.3 us | 1.3333 |      - |   5.77 KB |
 
 > [!Warning]
-> - Doesn't implement `IBufferDistributedCache`.
-> - Doesn't enforce a disk usage limit or maximum cache size.
+> - Does not implement IBufferDistributedCache.
+> - The reviewed implementation does not provide a configurable disk-usage or maximum-cache-size limit.
 
 ### [LiteDb.Extensions.Caching](https://www.nuget.org/packages/LiteDb.Extensions.Caching)
-| Method           | Mean      | Error      | StdDev    | Median    | Gen0    | Gen1   | Allocated |
-|----------------- |----------:|-----------:|----------:|----------:|--------:|-------:|----------:|
-| Set              | 3.9888 ms | 11.0469 ms | 2.8689 ms | 2.0319 ms | 16.3333 | 4.0000 |  70.72 KB |
-| SetAsync         | 1.8872 ms |  1.6183 ms | 0.2504 ms | 1.9066 ms | 16.3333 | 2.3333 |  69.62 KB |
-| Get              | 0.0304 ms |  0.0045 ms | 0.0007 ms | 0.0303 ms |  7.3333 | 0.6667 |  30.28 KB |
-| GetAsync         | 0.0216 ms |  0.0180 ms | 0.0047 ms | 0.0183 ms |  5.0000 |      - |  20.61 KB |
+| Method           | Mean        | Error        | StdDev     | Gen0    | Gen1   | Allocated |
+|----------------- |------------:|-------------:|-----------:|--------:|-------:|----------:|
+| Set              | 2,601.81 us |   765.681 us | 198.845 us | 15.3333 | 1.3333 |  64.49 KB |
+| SetAsync         | 1,859.92 us | 4,618.719 us | 714.752 us | 15.6667 | 2.3333 |  67.65 KB |
+| Get              |    19.57 us |     3.071 us |   0.475 us |  5.6667 | 0.6667 |  23.74 KB |
+| GetAsync         |    18.38 us |     2.176 us |   0.565 us |  6.0000 | 0.6667 |  24.58 KB |
 
 > [!Warning]
-> - Doesn't implement `IBufferDistributedCache`.
-> - Doesn't enforce a disk usage limit or maximum cache size.
+> - Does not implement IBufferDistributedCache.
+> - The reviewed implementation does not provide a configurable disk-usage or maximum-cache-size limit.
 
 ### [Caching.FileBackedDistributedCache](https://www.nuget.org/packages/Caching.FileBackedDistributedCache)
-| Method           | Mean      | Error     | StdDev    | Gen0   | Gen1   | Allocated |
-|----------------- |----------:|----------:|----------:|-------:|-------:|----------:|
-| Set              | 0.2634 ms | 0.1248 ms | 0.0193 ms | 2.0000 | 0.3333 |   8.39 KB |
-| SetAsync         | 0.2766 ms | 0.2580 ms | 0.0399 ms | 2.6667 | 0.6667 |   9.46 KB |
-| Get              | 0.0716 ms | 0.0092 ms | 0.0024 ms | 3.6667 | 0.3333 |  11.86 KB |
-| GetAsync         | 0.0818 ms | 0.0101 ms | 0.0026 ms | 3.6667 | 0.3333 |  13.08 KB |
+| Method           | Mean      | Error        | StdDev     | Gen0   | Gen1   | Allocated |
+|----------------- |----------:|-------------:|-----------:|-------:|-------:|----------:|
+| Set              | 763.84 us | 3,096.366 us | 479.166 us | 2.0000 | 0.3333 |   8.41 KB |
+| SetAsync         | 631.92 us | 1,329.146 us | 345.175 us | 2.6667 |      - |   9.46 KB |
+| Get              |  71.58 us |     7.238 us |   1.880 us | 3.6667 | 0.3333 |  11.85 KB |
+| GetAsync         |  81.93 us |    12.656 us |   3.287 us | 3.6667 | 0.6667 |  13.08 KB |
 
 > [!Warning]
-> - Doesn't implement `IBufferDistributedCache`.
-> - Doesn't enforce a disk usage limit or maximum cache size.
-> - Expired entries are treated as cache misses but their files are not automatically deleted, so disk usage can grow indefinitely.
-> - Doesn't implement automatic background eviction or cleanup of expired entries.
+> - Does not implement IBufferDistributedCache.
+> - The reviewed implementation does not provide a configurable disk-usage or maximum-cache-size limit.
+> - Expired entries are treated as cache misses, but their files are not automatically deleted; disk usage can therefore grow over time.
+> - The reviewed implementation does not provide a configurable disk-usage or maximum-cache-size limit.
 
 ### [Net.DistributedFileStoreCache](https://www.nuget.org/packages/Net.DistributedFileStoreCache)
 
 > [!Warning]
+> - Does not implement IBufferDistributedCache.
 > - Retains the entire cache in-memory. The filesystem is used as persistance/distribution mechanism.
-> - Doesn't support SlidingExpiration.
-> - Doesn't implement `IBufferDistributedCache`.
+> - Does not support SlidingExpiration.

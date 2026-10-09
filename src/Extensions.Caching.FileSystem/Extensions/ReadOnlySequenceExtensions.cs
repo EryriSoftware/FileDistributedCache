@@ -15,7 +15,7 @@ internal static class ReadOnlySequenceExtensions
                 FileAccess.Write,
                 FileShare.None,
                 bufferSize: BufferSize,
-                options: FileOptions.Asynchronous);
+                options: FileOptions.Asynchronous | FileOptions.SequentialScan);
 
             foreach (var segment in sequence)
             {
@@ -30,7 +30,8 @@ internal static class ReadOnlySequenceExtensions
                 FileMode.Create,
                 FileAccess.Write,
                 FileShare.None,
-                bufferSize: BufferSize);
+                bufferSize: BufferSize,
+                options: FileOptions.SequentialScan);
 
             foreach (var segment in sequence)
             {

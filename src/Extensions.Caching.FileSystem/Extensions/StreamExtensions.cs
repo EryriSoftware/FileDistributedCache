@@ -1,5 +1,5 @@
-﻿using System.Buffers;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
+using Eryri.Buffers;
 using Eryri.Buffers.Extensions;
 using Eryri.Extensions.Caching.FileSystem.Models;
 
@@ -9,7 +9,7 @@ internal static class StreamExtensions
 {
     public static async Task WriteAsync(this Stream stream, ICollection<Metadata> values, CancellationToken cancellationToken)
     {
-        var writer = new ArrayBufferWriter<byte>();
+        using var writer = new ArrayPoolBufferWriter<byte>();
 
         writer.Write(values.Count);
         await stream.WriteAsync(writer.WrittenMemory, cancellationToken);

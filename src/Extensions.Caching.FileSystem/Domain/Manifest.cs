@@ -29,12 +29,31 @@ internal class Manifest(IOptions<FileCacheOptions> options)
     }
 
     public bool TryGetValue(string key, [NotNullWhen(true)] out Metadata? value) => files.TryGetValue(key, out value);
-    public bool TryUpdate(string key, Metadata newValue, Metadata comparisonValue)
+    public bool TryUpdate(
+        string key,
+        Metadata value,
+        long lastAccessTicks,
+        bool isAccessed,
+        out Metadata newValue)
     {
-        newValue = newValue with
+        newValue = value with
+        {
+            LastAccessTicks = lastAccessTicks,
+            AccessCount = isAccessed ? value.AccessCount + 1 : value.AccessCount,
+            Version = value.Version + 1
+        };
+        return TryUpdateCore(key: key, newValue, comparisonValue: value);
+    }
+
+    public bool TryUpdate(string key, Metadata newValue, Metadata comparisonValue) => TryUpdateCore(
+        key: key,
+        newValue: newValue with
         {
             Version = comparisonValue.Version + 1
-        };
+        },
+        comparisonValue: comparisonValue);
+    private bool TryUpdateCore(string key, Metadata newValue, Metadata comparisonValue)
+    {
         if (files.TryUpdate(key, newValue, comparisonValue))
         {
             Enqueue(newValue, comparisonValue);
@@ -111,10 +130,7 @@ internal class Manifest(IOptions<FileCacheOptions> options)
                 lruQueue.Enqueue(candidate, new SequencedValue<long>(value.LastAccessTicks));
                 break;
             case EvictionPolicy.LFU:
-                if (value.AccessCount != comparisonValue?.AccessCount)
-                {
-                    lfuQueue.Enqueue(candidate, value.AccessCount);
-                }
+                lfuQueue.Enqueue(candidate, value.AccessCount);
 
                 break;
             case EvictionPolicy.FIFO:

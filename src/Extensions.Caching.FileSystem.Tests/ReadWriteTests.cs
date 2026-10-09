@@ -1,5 +1,6 @@
 ﻿using System.Buffers;
 using System.Security.Cryptography;
+using Eryri.Buffers;
 using Eryri.Extensions.Caching.FileSystem.Tests.Contexts;
 using FluentAssertions;
 using Microsoft.Extensions.Caching.Distributed;
@@ -44,7 +45,7 @@ internal class ReadWriteTests
         {
             AbsoluteExpiration = ctx.Now.AddDays(1)
         };
-        var buffer = new ArrayBufferWriter<byte>(payloadSize);
+        using var buffer = new ArrayPoolBufferWriter<byte>(payloadSize);
 
         // Act
         var key = Guid.NewGuid().ToString("N") + ForbiddenFilenameCharacters;
@@ -67,7 +68,7 @@ internal class ReadWriteTests
         {
             AbsoluteExpiration = ctx.Now.AddDays(1)
         };
-        var buffer = new ArrayBufferWriter<byte>(payloadSize);
+        using var buffer = new ArrayPoolBufferWriter<byte>(payloadSize);
 
         // Act
         var key = Guid.NewGuid().ToString("N") + ForbiddenFilenameCharacters;
