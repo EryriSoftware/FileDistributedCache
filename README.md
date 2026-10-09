@@ -18,6 +18,7 @@ Use it directly when local disk is the right cache, or register it as the second
 > [!IMPORTANT]
 > **Local, single-process.** `IDistributedCache` is the interface this package implements, not a promise of distributed storage. Each process should have its own cache; do not use this provider when replicas must share entries.
 
+--- 
 ## Why use it?
 
 - **Keep RAM for your application.** Store reusable payloads in files rather than retaining the whole disk-backed cache in memory. A local filesystem is useful when your reusable working set is larger than the memory budget you want to assign to caching.
@@ -28,6 +29,7 @@ Use it directly when local disk is the right cache, or register it as the second
 
 **Good fit:** a single-process service or worker with reproducible cache values and useful local disk space. **Not a fit:** cross-replica consistency. The cache's configured byte limit controls its own entries; it does not reserve free space for other applications.
 
+---
 ## Scope at a glance
 
 | Requirement | This package |
@@ -40,6 +42,7 @@ Use it directly when local disk is the right cache, or register it as the second
 | Cache persistence across restarts | Yes; If a persistent Cache Directory is supplied |
 | Automatic RAM-pressure-triggered spill | No; use as a disk-backed tier, not as an automatic memory overflow mechanism |
 
+---
 ## Install and get started
 
 The NuGet package ID is `Eryri.FileDistributedCache`.
@@ -93,7 +96,6 @@ var options = new HybridCacheEntryOptions
 {
     Expiration = TimeSpan.FromMinutes(10),
     LocalCacheExpiration = TimeSpan.FromSeconds(5), // Keep in-memory items for only a short period
-    Flags = HybridCacheEntryFlags.DisableLocalCache // Disables the 'IMemoryCache' for the purpose of thie example
 };
 
 await cache.SetAsync("product:42", "Cached product data", options);
@@ -108,6 +110,7 @@ Console.WriteLine(value);
 
 Both tiers remain local to this process. For a shared secondary cache across replicas, use a backend designed for sharing.
 
+---
 ## Expiration and capacity
 
 Set a byte-based size limit if you want the cache to control its footprint. When a new entry would exceed that limit, the cache evicts existing entries as needed *before* adding it. The configured eviction policy determines which eligible entries are selected. Expired entries are also removed automatically by a background timer scheduled for the next expiry.
@@ -141,6 +144,7 @@ For manual capacity reduction, `IFileDistributedCache.Compact(decimal percentage
 | `CacheDirectory` | The persistent directory for cache files. No value indicates an ephemeral tmp directory should be used which will be deleted during normal shutdown. |
 | `SnapshotInterval` | If a persistent directory is supplied, determines how often the Write Ahead Log is compacted into a snapshot. |
 
+---
 ## Operational boundaries
 
 - **One process owns one cache.** Do not share the cache directory or assume another process can observe its entries safely.
@@ -148,6 +152,7 @@ For manual capacity reduction, `IFileDistributedCache.Compact(decimal percentage
 - **Filesystem access matters.** The process needs permission to create, read, write, and delete files in its cache directory. A configured cache-size limit does not protect against another workload filling the underlying filesystem.
 - **Write failures:** If the filesystem rejects a write, the entry is not added and an error is logged. Callers should not treat `Set` as proof that the entry can later be read back.
 
+---
 ## Benchmarks
 
 The benchmark that matters most for this package is **sustained operation with realistic workloads while the cache is already full**: this tests the cost of making room, not just writing into an empty directory. The figures below are useful directional evidence, not a cross-machine performance guarantee.
@@ -188,9 +193,9 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 | GetBufferedAsync |   171.0 us |    10.42 us |   1.61 us | 2.6667 | 0.3333 |  11.17 KB |
 
 > [!Warning]
-> - Size limits are eventual, not strict.
-> - Write methods publishes without checking MaxTotalSize or MaxEntries
-> - Eviction only acts on its periodic scan. LRU policy only.
+> - Capacity enforcement is eventual rather than strict.
+> - Write operations do not check MaxTotalSize or MaxEntries before publishing entries.
+> - Eviction is performed by a periodic scan; LRU is the supported policy in the reviewed implementation.
 
 ### [NeoSmart.Caching.Sqlite](https://www.nuget.org/packages/NeoSmart.Caching.Sqlite)
 | Method           | Mean       | Error      | StdDev     | Gen0   | Gen1   | Allocated |
@@ -201,8 +206,8 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 | GetAsync         | 1,500.5 us |   424.8 us |   110.3 us | 1.3333 |      - |   5.77 KB |
 
 > [!Warning]
-> - Doesn't implement `IBufferDistributedCache`.
-> - Doesn't enforce a disk usage limit or maximum cache size.
+> - Does not implement IBufferDistributedCache.
+> - The reviewed implementation does not provide a configurable disk-usage or maximum-cache-size limit.
 
 ### [LiteDb.Extensions.Caching](https://www.nuget.org/packages/LiteDb.Extensions.Caching)
 | Method           | Mean        | Error        | StdDev     | Gen0    | Gen1   | Allocated |
@@ -213,8 +218,8 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 | GetAsync         |    18.38 us |     2.176 us |   0.565 us |  6.0000 | 0.6667 |  24.58 KB |
 
 > [!Warning]
-> - Doesn't implement `IBufferDistributedCache`.
-> - Doesn't enforce a disk usage limit or maximum cache size.
+> - Does not implement IBufferDistributedCache.
+> - The reviewed implementation does not provide a configurable disk-usage or maximum-cache-size limit.
 
 ### [Caching.FileBackedDistributedCache](https://www.nuget.org/packages/Caching.FileBackedDistributedCache)
 | Method           | Mean      | Error        | StdDev     | Gen0   | Gen1   | Allocated |
@@ -225,14 +230,14 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 | GetAsync         |  81.93 us |    12.656 us |   3.287 us | 3.6667 | 0.6667 |  13.08 KB |
 
 > [!Warning]
-> - Doesn't implement `IBufferDistributedCache`.
-> - Doesn't enforce a disk usage limit or maximum cache size.
-> - Expired entries are treated as cache misses but their files are not automatically deleted, so disk usage can grow indefinitely.
-> - Doesn't implement automatic background eviction or cleanup of expired entries.
+> - Does not implement IBufferDistributedCache.
+> - The reviewed implementation does not provide a configurable disk-usage or maximum-cache-size limit.
+> - Expired entries are treated as cache misses, but their files are not automatically deleted; disk usage can therefore grow over time.
+> - The reviewed implementation does not provide a configurable disk-usage or maximum-cache-size limit.
 
 ### [Net.DistributedFileStoreCache](https://www.nuget.org/packages/Net.DistributedFileStoreCache)
 
 > [!Warning]
+> - Does not implement IBufferDistributedCache.
 > - Retains the entire cache in-memory. The filesystem is used as persistance/distribution mechanism.
-> - Doesn't support SlidingExpiration.
-> - Doesn't implement `IBufferDistributedCache`.
+> - Does not support SlidingExpiration.
