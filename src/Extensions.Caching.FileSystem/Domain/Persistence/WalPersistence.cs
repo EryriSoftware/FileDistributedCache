@@ -12,7 +12,7 @@ internal class WalPersistence : WriteAheadLog<Mutation>, IPersistence
     private readonly CacheDirectoryOwner directoryOwner;
     protected override ulong FormatVersion { get; } = 1;
 
-    private ITimer snapshotSchedule;
+    private readonly ITimer snapshotSchedule;
 
     public WalPersistence(
         Manifest manifest,

@@ -1,6 +1,5 @@
 ﻿using System.Buffers;
 using Eryri.Buffers.Extensions;
-using Eryri.Extensions.Caching.FileSystem.Extensions;
 using Eryri.Extensions.Caching.FileSystem.Models;
 
 namespace Eryri.Extensions.Caching.FileSystem.Extensions;

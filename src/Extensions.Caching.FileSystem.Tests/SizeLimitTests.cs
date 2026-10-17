@@ -1,5 +1,4 @@
 ﻿using System.Security.Cryptography;
-using AutoFixture;
 using Eryri.Extensions.Caching.FileSystem.Tests.Contexts;
 using FluentAssertions;
 using Microsoft.Extensions.Caching.Distributed;
@@ -9,8 +8,7 @@ namespace Eryri.Extensions.Caching.FileSystem.Tests;
 [TestFixture, Parallelizable(ParallelScope.All)]
 internal class SizeLimitTests
 {
-    private Fixture fixture = new Fixture();
-    private CancellationToken CancellationToken = TestContext.CurrentContext.CancellationToken;
+    private CancellationToken CancellationToken => TestContext.CurrentContext.CancellationToken;
     private byte[] Bytes(int length = 100) => RandomNumberGenerator.GetBytes(length);
 
     [Test]

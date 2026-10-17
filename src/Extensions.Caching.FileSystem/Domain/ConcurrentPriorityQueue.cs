@@ -7,7 +7,7 @@ internal class ConcurrentPriorityQueue<TElement, TPriority>
 {
     private readonly object sync = new ();
     private readonly ConcurrentQueue<(TElement Element, TPriority Priority)> pending = new ();
-    private PriorityQueue<TElement, TPriority> queue = new PriorityQueue<TElement, TPriority>();
+    private readonly PriorityQueue<TElement, TPriority> queue = new PriorityQueue<TElement, TPriority>();
 
     public void Enqueue(TElement element, TPriority priority)
     {

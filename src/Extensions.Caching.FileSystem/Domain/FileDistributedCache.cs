@@ -22,7 +22,6 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         this.timeProvider = timeProvider;
         settings = optionsAccessor.Value;
-        minScanFrequencyTicks = settings.ExpirationScanFrequency.Ticks;
         this.logger = logger;
         cleanupTimer = timeProvider.CreateTimer(_ => RemoveExpired(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         this.manifest = manifest;
@@ -37,7 +36,6 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     private bool isDisposed = false;
     private readonly ILogger? logger;
     private readonly FileCacheOptions settings;
-    private readonly long minScanFrequencyTicks;
     private readonly TimeProvider timeProvider;
     private readonly DirectoryInfo cacheDirectory;
     private readonly Manifest manifest;
@@ -49,7 +47,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     public bool TryGet(string key, IBufferWriter<byte> destination)
     {
-        if (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
+        while (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
         {
             UpdateEntry(key, true);
             try
@@ -57,26 +55,32 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                 destination.ReadFile(entry.Path);
                 return true;
             }
+            catch (FileNotFoundException)
+            {
+                // The entry was replaced; retry the manifest lookup.
+            }
             catch (Exception ex)
             {
                 logger?.LogCritical(ex, "Failed to read cache file");
                 return false;
             }
         }
-        else
-        {
-            return false;
-        }
+
+        return false;
     }
 
     public byte[]? Get(string key)
     {
-        if (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
+        while (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
         {
             UpdateEntry(key, true);
             try
             {
                 return File.ReadAllBytes(entry.Path);
+            }
+            catch (FileNotFoundException)
+            {
+                // The entry was replaced; retry the manifest lookup.
             }
             catch (Exception ex)
             {
@@ -84,15 +88,13 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                 return null;
             }
         }
-        else
-        {
-            return null;
-        }
+
+        return null;
     }
 
     public async ValueTask<bool> TryGetAsync(string key, IBufferWriter<byte> destination, CancellationToken cancellationToken)
     {
-        if (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
+        while (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
         {
             UpdateEntry(key, true);
             try
@@ -100,26 +102,32 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                 await destination.ReadFileAsync(entry.Path, cancellationToken);
                 return true;
             }
+            catch (FileNotFoundException)
+            {
+                // The entry was replaced; retry the manifest lookup.
+            }
             catch (Exception ex)
             {
                 logger?.LogCritical(ex, "Failed to read cache file");
                 return false;
             }
         }
-        else
-        {
-            return false;
-        }
+
+        return false;
     }
 
     public async Task<byte[]?> GetAsync(string key, CancellationToken cancellationToken)
     {
-        if (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
+        while (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
         {
             UpdateEntry(key, true);
             try
             {
                 return await File.ReadAllBytesAsync(entry.Path, cancellationToken);
+            }
+            catch (FileNotFoundException)
+            {
+                // The entry was replaced; retry the manifest lookup.
             }
             catch (Exception ex)
             {
@@ -127,10 +135,8 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                 return null;
             }
         }
-        else
-        {
-            return null;
-        }
+
+        return null;
     }
 
     public void Set(string key, ReadOnlySequence<byte> value, DistributedCacheEntryOptions options)
@@ -332,7 +338,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         if (dueTimeTicks is { } dueTicks && dueTicks <= nextCleanup)
         {
             nextCleanup = dueTicks;
-            var seconds = Math.Clamp(dueTicks - timeProvider.GetUtcNow().UtcTicks, minScanFrequencyTicks, MaxTimerDelay.Ticks);
+            var seconds = Math.Clamp(dueTicks - timeProvider.GetUtcNow().UtcTicks, TimeSpan.Zero.Ticks, MaxTimerDelay.Ticks);
             cleanupTimer.Change(TimeSpan.FromTicks(seconds), Timeout.InfiniteTimeSpan);
         }
     }
