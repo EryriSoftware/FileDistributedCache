@@ -1,75 +1,57 @@
-# [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
+# Eryri.FileDistributedCache
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-purple.svg)](https://dotnet.microsoft.com/)
 [![NuGet](https://img.shields.io/nuget/v/Eryri.FileDistributedCache.svg)](https://www.nuget.org/packages/Eryri.FileDistributedCache)
-[![NuGet Downloads](https://img.shields.io/nuget/dt/Eryri.FileDistributedCache.svg)](https://www.nuget.org/packages/Eryri.FileDistributedCache)
+[![NuGet downloads](https://img.shields.io/nuget/dt/Eryri.FileDistributedCache.svg)](https://img.shields.io/nuget/dt/Eryri.FileDistributedCache)
+[![License](https://img.shields.io/github/license/EryriSoftware/FileDistributedCache)](https://github.com/EryriSoftware/FileDistributedCache/blob/main/LICENSE)
 
-**More cache. Less RAM. No cache server.**
+**A bounded, local disk-backed cache. No Redis. No cache server.**
 
-Cache large, reusable datasets on local disk without keeping the entire cache in memory or running a separate cache service. Eryri.FileDistributedCache is a bounded, filesystem-backed cache for .NET, with automatic eviction, expiration and optional persistence across process restarts.
+Eryri.FileDistributedCache implements the standard .NET `IDistributedCache` and `IBufferDistributedCache` APIs while storing cache values on the local filesystem. It gives one application process more cache capacity than memory alone, with configurable size limits, expiration, eviction policies, and optional recovery across restarts.
 
-Implements .NET's `IDistributedCache` and `IBufferDistributedCache` interfaces, so you can use familiar caching APIs with local filesystem storage.
+Use it as:
 
-**Key features**
-
-- **Bounded storage:** Configure a byte limit and automatically evict entries to make room before admitting new writes.
-- **Low memory overhead:** Store cache values on disk instead of retaining the entire cached dataset in managed memory.
-- **Configurable eviction:** Choose `LRU`, `LFU`, `FIFO` or `TTL`-based eviction to suit your workload.
-- **Automatic expiration:** Support absolute and sliding expiration, with background cleanup scheduled around upcoming expirations.
-- **Optional persistence:** Preserve cache entries across process restarts using a write-ahead log and periodic snapshots.
-- **Native .NET integration:** Support `IDistributedCache`, `IBufferDistributedCache` and `HybridCache` secondary-tier integration.
-- **No additional service:** Use local disk without deploying Redis or another cache server.
-
-Use an ephemeral cache for disposable data, or configure a persistent cache directory when you want entries to survive normal process restarts.
-
-### Important: local, single-process cache
-
-Despite implementing `IDistributedCache`, this package is **not a distributed cache backend**. Each process owns its own cache, and entries are not shared or synchronised across processes or application replicas.
-
-Cached values should always be recoverable from their source of truth. Persistence helps avoid rebuilding the cache after routine restarts; it does not turn the cache into durable primary storage.
-
----
-## Why use it?
-
-- **Cache more without consuming more RAM.** Store large, reusable datasets on disk instead of retaining every cached value in memory. Ideal when the working set exceeds the memory budget you want to allocate to caching.
-- **Keep cache growth under control.** Set a byte limit and automatically evict entries to make room before admitting new writes. Choose `LRU`, `LFU`, `FIFO` or `TTL`-based eviction to match your workload.
-- **Remove expired data automatically.** Support absolute and sliding expiration, with background cleanup scheduled around upcoming expirations rather than relying solely on fixed-interval scans.
-- **Use familiar .NET caching APIs.** Integrate through `IDistributedCache` or `IBufferDistributedCache`, with thread-safe access and Native AOT compatibility.
-- **Avoid unnecessary infrastructure.** Give a single-process application more cache capacity without deploying and maintaining a separate cache server.
-- **Recover cached data after restarts.** Configure a persistent cache directory to retain entries across normal process restarts, without keeping the entire cache index in memory.
-
-**Ideal for:** APIs, background workers and services with large, reusable datasets, limited RAM and available local disk space.
-
-**Not intended for:** sharing cache entries across application replicas or replacing a database as the source of truth. The configured cache limit governs the cache's own entries; it does not reserve disk space or protect the underlying filesystem from other workloads.
-
----
-### Scope at a glance
-
-| Requirement | Supported |
-| --- | --- |
-| Standard .NET caching APIs | `IDistributedCache`, `IBufferDistributedCache` |
-| Filesystem-backed cache storage | Yes |
-| Configurable cache-size limit | Yes; byte-based, with automatic capacity eviction |
-| LRU, LFU, FIFO and TTL eviction | Yes |
-| Absolute and sliding expiration | Yes; automatic background cleanup |
-| Persistence across process restarts | Yes; configure a persistent cache directory |
-| Native AOT compatibility | Yes |
-| `HybridCache` secondary-tier integration | Yes |
-| Shared cache across processes or replicas | No |
-| Automatic spill from RAM to disk under memory pressure | No |
-
-Eryri is designed for **local cache capacity, not distributed coordination**. Use it when a single process needs a bounded filesystem-backed cache; choose a shared backend when multiple application instances must access the same cached entries.
-
----
-## Install and get started
-
-Install the NuGet package:
+- a **standalone local cache** when your application needs fast, bounded filesystem storage without operating another service; or
+- a **`HybridCache` secondary tier** behind the in-memory local tier.
 
 ```bash
 dotnet add package Eryri.FileDistributedCache
 ```
 
-Register the cache with dependency injection and use the standard `IDistributedCache` API:
+> **Important:** This is local, single-process storage. With a configured persistent directory, it can provide durable local storage across normal process restarts. It is not a shared Redis replacement, a cross-replica store, or a backup system.
+
+## Why use Eryri?
+
+| Need | Eryri.FileDistributedCache |
+| --- | --- |
+| More cache capacity without keeping every value in managed memory | Filesystem-backed values |
+| A predictable cache budget | Byte-based size limit and automatic eviction |
+| No additional infrastructure | Runs in the application process |
+| Standard .NET integration | `IDistributedCache`, `IBufferDistributedCache`, dependency injection, and `HybridCache` |
+| Durable local storage without an external service | Persistent directory with write-ahead logging and snapshots |
+| Different workload strategies | LRU, LFU, FIFO, and TTL eviction |
+| Shared data between replicas | **Not supported**; use a shared cache service |
+
+Compared with an in-memory cache, Eryri trades some latency for substantially more capacity and optional restart recovery. Compared with SQLite or another embedded database cache, it provides standard .NET cache abstractions and cache-specific eviction semantics without requiring application code to manage a database schema. Compared with Redis, it needs no service and has no network hop, but it is local to one process and cannot coordinate replicas.
+
+## Choose it when
+
+- A single process needs a cache larger than the memory budget you want to reserve for it.
+- Values are expensive to retrieve or compute but remain recoverable from another source.
+- You need a maximum cache size and an eviction policy rather than an unbounded directory.
+- You want a local `HybridCache` secondary tier without deploying Redis or another service.
+- You run offline, on a developer workstation, in a test environment, or in a deployment where a local persistent volume is available.
+
+## Choose something else when
+
+- Multiple processes, containers, or application replicas must read and write the same entries. Use a shared backend such as Redis or a managed distributed cache.
+- You need replication, transactions, backups, or a system of record across hosts. Use a database or shared durable storage system.
+- You need automatic migration of an existing in-memory cache to disk under memory pressure. Configure `HybridCache` explicitly instead.
+- You need semantic search, vector indexing, serialization, or model management. Eryri stores opaque cache values; pair it with the system that provides those capabilities.
+
+## Quick start
+
+Register Eryri with dependency injection and use the familiar distributed-cache API:
 
 ```csharp
 using Eryri.Extensions.Caching.FileSystem;
@@ -77,35 +59,32 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 
 using var services = new ServiceCollection()
-    .AddDistributedFileCache()
-    .BuildServiceProvider();
+	.AddDistributedFileCache(options =>
+	{
+		options.SizeLimitGiB = 1;
+		options.EvictionPolicy = EvictionPolicy.LRU;
+	})
+	.BuildServiceProvider();
 
 var cache = services.GetRequiredService<IDistributedCache>();
 
 await cache.SetStringAsync(
-    "product:42",
-    "Cached product data",
-    new DistributedCacheEntryOptions
-    {
-        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
-    });
+	"product:42",
+	"Cached product data",
+	new DistributedCacheEntryOptions
+	{
+		AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
+	});
 
 var value = await cache.GetStringAsync("product:42");
-
 Console.WriteLine(value ?? "Cache miss");
 ```
 
-That's it. No cache server, database or additional infrastructure required.
+That is all that is required for an ephemeral local cache. No database, cache server, or separate process is needed.
 
-### Cache misses are normal
+## Use with `HybridCache`
 
-A cached value may be missing because it expired, was evicted to make room for another entry, or was lost when an ephemeral cache was shut down.
-
-Always treat the cache as an optimisation: retrieve or recompute missing values from their source of truth, then cache the result again.
-
-### Use with `HybridCache`
-
-[Microsoft's `HybridCache`](https://learn.microsoft.com/en-us/aspnet/core/performance/caching/hybrid) combines an in-memory cache with a secondary cache provider. Register Eryri as the `IDistributedCache` implementation to use local filesystem storage for that secondary tier.
+Use Eryri as the filesystem-backed secondary tier while `HybridCache` manages the in-memory local tier:
 
 ```csharp
 using Eryri.Extensions.Caching.FileSystem;
@@ -113,157 +92,150 @@ using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
 
 using var services = new ServiceCollection()
-    .AddDistributedFileCache()
-    .AddHybridCache()
-    .BuildServiceProvider();
+	.AddDistributedFileCache(options =>
+	{
+		options.SizeLimitGiB = 2;
+		options.EvictionPolicy = EvictionPolicy.LRU;
+	})
+	.AddHybridCache()
+	.BuildServiceProvider();
 
 var cache = services.GetRequiredService<HybridCache>();
 
-var options = new HybridCacheEntryOptions
-{
-    Expiration = TimeSpan.FromMinutes(10),
-    LocalCacheExpiration = TimeSpan.FromSeconds(5)
-};
-
 var value = await cache.GetOrCreateAsync(
-    "product:42",
-    _ => ValueTask.FromResult("Cached product data"),
-    options);
-
-Console.WriteLine(value);
+	"product:42",
+	_ => ValueTask.FromResult("Cached product data"),
+	new HybridCacheEntryOptions
+	{
+		Expiration = TimeSpan.FromMinutes(10),
+		LocalCacheExpiration = TimeSpan.FromSeconds(5)
+	});
 ```
 
-Here, the in-memory entry has a five-second expiration, while the overall cache entry has a ten-minute expiration.
+The in-memory entry expires after five seconds, while the overall entry expires after ten minutes. `HybridCache` does not automatically spill arbitrary in-memory entries to disk; both tiers are configured local caches.
 
-**Note:** Eryri provides the filesystem-backed secondary cache; `HybridCache` manages the caching tiers. This does not automatically spill in-memory entries to disk when RAM is exhausted. Both tiers remain local to the process.
+## AI and local data workloads
 
----
-## Expiration and capacity
+Eryri is useful for AI applications that repeatedly retrieve or compute data locally and can safely rebuild it after a cache miss:
 
-Eryri.FileDistributedCache keeps cache storage bounded and removes expired entries automatically. Configure a storage limit, choose an eviction policy and let the cache manage its own capacity.
-
-### Bounded storage
-
-Set a maximum cache size in bytes. When additional space is required, the cache evicts entries according to its configured policy before admitting new writes.
+- **LLM response caching:** cache deterministic prompt results using a key that includes the model, relevant settings, prompt version, and input hash.
+- **Embedding and retrieval caching:** cache serialized embeddings, chunk lookups, and retrieved context when the underlying documents or embedding model version are part of the key.
+- **Local model metadata and artifacts:** cache downloaded metadata or derived files when the deployment has a suitable persistent volume and the source can be checked again.
+- **Agent and tool-call acceleration:** cache idempotent, repeatable tool results with an expiration appropriate to the data freshness requirement.
+- **Offline and development workflows:** reduce repeated network calls and model or document preparation during local development, evaluation, and constrained deployments.
 
 ```csharp
 services.AddDistributedFileCache(options =>
 {
-    options.SizeLimitBytes = 1024L * 1024 * 1024; // 1 GiB
+	options.CacheDirectory = "/var/cache/my-agent";
+	options.SizeLimitGiB = 10;
+	options.EvictionPolicy = EvictionPolicy.LFU;
+	options.DefaultAbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24);
 });
 ```
 
-The size limit controls the cache's own storage, not total filesystem usage. It does not reserve disk space or account for unrelated files and workloads.
+Recommended cache-key inputs for AI workloads include the model/provider identifier, model version, prompt or pipeline version, relevant generation settings, document/index version, and a stable input hash. Do not use the cache as the source of truth for safety decisions, permissions, financial data, or other data that must be authoritative. Eryri does not provide vector search, embedding generation, prompt templating, or cross-process coordination.
 
-### Eviction policies
+## Capacity and eviction
 
-Choose the policy that best matches your workload:
+Set a maximum cache size in bytes, mebibytes, or gibibytes:
 
-| Policy | Behaviour | Best suited to |
-|---|---|---|
-| `LRU` | Evicts the least recently used entries | Workloads where recently accessed data is more likely to be reused |
-| `LFU` | Evicts the least frequently used entries | Workloads with a stable set of frequently accessed items |
-| `FIFO` | Evicts the oldest entries first, regardless of access frequency | Simple insertion-order eviction |
-| `TTL` | Prioritises entries according to their time to live | Workloads where remaining lifetime should influence eviction |
+```csharp
+services.AddDistributedFileCache(options =>
+{
+	options.SizeLimitBytes = 1024L * 1024 * 1024; // 1 GiB
+	options.EvictionPolicy = EvictionPolicy.LRU;
+});
+```
 
-The eviction policy determines which entries are removed when capacity is needed. Expiration is separate: an entry can expire regardless of the selected capacity policy.
+The size limit applies to storage managed by this cache. It does not reserve disk space or account for unrelated files, filesystem metadata, WAL files, or other workloads. Leave appropriate free-space headroom and monitor the volume used by the application.
 
-### Automatic expiration
+| Policy | Behavior | Suitable for |
+| --- | --- | --- |
+| `LRU` | Evicts least recently used entries | General-purpose workloads where recent access predicts reuse |
+| `LFU` | Evicts least frequently used entries | Stable hot sets and repeated AI/model or reference data |
+| `FIFO` | Evicts oldest entries first | Simple insertion-order retention |
+| `TTL` | Prioritizes entries by remaining lifetime | Workloads where freshness and expiration should influence capacity eviction |
 
-Use the standard .NET `DistributedCacheEntryOptions` API to configure absolute or sliding expiration.
+Capacity eviction is separate from expiration. An entry can expire regardless of the selected capacity policy. Expired entries are cleaned up automatically, and a write can evict existing entries to make room for a new value.
+
+An individual value larger than the configured size limit cannot be made to fit by eviction; size limits are intended to bound normal cache occupancy and should be paired with application-level payload limits when strict admission control is required.
+
+To request proactive compaction through the package-specific API:
+
+```csharp
+var fileCache = services.GetRequiredService<IFileDistributedCache>();
+fileCache.Compact(0.10m); // request removal of at least 10% of entries
+```
+
+## Expiration
+
+Use the standard `DistributedCacheEntryOptions` API:
 
 ```csharp
 await cache.SetStringAsync(
-    "product:42",
-    "Cached product data",
-    new DistributedCacheEntryOptions
-    {
-        AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1),
-        SlidingExpiration = TimeSpan.FromMinutes(10)
-    });
+	"product:42",
+	"Cached product data",
+	new DistributedCacheEntryOptions
+	{
+		AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1),
+		SlidingExpiration = TimeSpan.FromMinutes(10)
+	});
 ```
 
-With these settings, the entry expires after one hour at the latest, or after ten minutes without access, whichever occurs first.
+The entry expires after one hour at the latest, or after ten minutes without access, whichever occurs first. You can configure defaults for entries that do not specify an expiration. Treat cache misses as normal: retrieve or recompute the value from its source of truth and cache it again.
 
-Expired entries are cleaned up automatically. Background cleanup is scheduled around upcoming expirations, helping avoid unnecessary repeated full-cache scans.
+Entry-level expiration settings take precedence over the corresponding `FileCacheOptions` defaults. If no entry-level or configured default expiration is present, the value has no time-based expiration and remains subject to capacity eviction.
 
-### Reclaim space explicitly
+## Persistence and operational reliability
 
-When you need to reclaim cache capacity proactively, use `IFileDistributedCache.Compact(decimal percentage)` to request eviction of a proportion of the cache.
-
-This is useful when you want to reduce cache occupancy without waiting for subsequent writes to require additional space.
-
-## Configuration reference
-
-Configure Eryri.FileDistributedCache through `AddDistributedFileCache`. The options control capacity, eviction, expiration and persistence.
-
-| Option | Purpose |
-|---|---|
-| `EvictionPolicy` | Selects the policy used for capacity eviction and manual compaction: `LRU`, `LFU`, `FIFO` or `TTL`. |
-| `SizeLimitBytes` | Sets the maximum configured cache size in bytes. |
-| `SizeLimitMiB` | Sets the cache size limit in [mebibytes](https://simple.wikipedia.org/wiki/Mebibyte) (MiB). |
-| `SizeLimitGiB` | Sets the cache size limit in [gibibytes](https://simple.wikipedia.org/wiki/Gibibyte) (GiB). |
-| `DefaultSlidingExpiration` | Sets the default sliding expiration for entries that do not specify one. |
-| `DefaultAbsoluteExpirationRelativeToNow` | Sets the default absolute expiration relative to the time an entry is added. |
-| `CacheDirectory` | Specifies the cache directory. When omitted, the cache uses an ephemeral temporary directory that is deleted during normal shutdown. |
-| `SnapshotInterval` | Sets how often the write-ahead log (WAL) is compacted into a snapshot when a persistent cache directory is configured. |
-
-### Example
-
-Configure a 1 GiB cache with least-recently-used eviction:
+By default, the cache uses a temporary directory that is removed during normal shutdown. Configure `CacheDirectory` to use Eryri as durable local storage whose values can be recovered after normal process restarts:
 
 ```csharp
 services.AddDistributedFileCache(options =>
 {
-    options.SizeLimitGiB = 1;
-    options.EvictionPolicy = EvictionPolicy.LRU;
+	options.CacheDirectory = "/var/cache/myapp";
+	options.SizeLimitGiB = 1;
+	options.EvictionPolicy = EvictionPolicy.LRU;
 });
 ```
 
-To retain entries across normal process restarts, configure a persistent directory as well:
+For containers, mount a suitable persistent volume at the configured path. The application identity needs read, write, create, rename, and delete permissions. Snapshots and write-ahead-log checkpointing are managed internally; `SnapshotInterval` controls the snapshot interval when persistence is enabled.
 
-```csharp
-services.AddDistributedFileCache(options =>
-{
-    options.CacheDirectory = "/var/cache/myapp";
-    options.SizeLimitGiB = 1;
-    options.EvictionPolicy = EvictionPolicy.LRU;
-});
-```
+This persistence mode is durable local storage, but it is not replicated or backed up automatically. A process crash or forced termination can leave the latest write subject to the filesystem and WAL durability guarantees. Disk failure, volume deletion, permission changes, corruption, expiration, or configured capacity eviction can still remove or make values unavailable. Use a database or backup system when you need transactions, replication, independent recovery, or guaranteed retention.
 
-Choose a directory that the application can access and that persists across deployments or container restarts.
+Eryri therefore supports two valid roles: a bounded cache for recoverable values, and a durable local store for values whose durability requirements fit a single persistent volume and the configured expiration and eviction policy.
 
-### Automatic expiration
+Read failures and missing files are treated as cache misses rather than allowing an unavailable cached value to become application data. Write and cleanup failures are logged, but filesystem capacity and permissions remain deployment responsibilities. Monitor the persistent volume, reserve free space, and include the cache directory in your backup and recovery plan when the stored values are durable application data.
 
-Eryri schedules a timer for upcoming entry expirations and evicts expired entries when they become due. It does not rely on periodic full-cache expiration scans, so there is no cleanup-frequency option to configure.
+## Configuration
 
-Expiration and capacity eviction are separate mechanisms: expiration removes entries whose lifetime has ended, while the configured eviction policy determines which entries are removed when additional capacity is required.
+| Option | Description |
+| --- | --- |
+| `SizeLimitBytes` | Maximum configured cache size in bytes. |
+| `SizeLimitMiB` | Maximum configured cache size in MiB. |
+| `SizeLimitGiB` | Maximum configured cache size in GiB. |
+| `EvictionPolicy` | `LRU`, `LFU`, `FIFO`, or `TTL`. Defaults to `LRU`. |
+| `DefaultSlidingExpiration` | Default sliding expiration for entries without one. |
+| `DefaultAbsoluteExpirationRelativeToNow` | Default absolute expiration for entries without one. |
+| `CacheDirectory` | Cache directory. Omit for an ephemeral temporary directory. |
+| `SnapshotInterval` | Interval for compacting the WAL into a recovery snapshot. |
 
----
-### Performance and benchmarks
+## Performance
 
-Eryri.FileDistributedCache is designed for low-latency filesystem-backed caching with bounded storage and minimal managed-memory overhead.
+Filesystem performance depends on the operating system, filesystem, storage medium, payload size, concurrency, cache state, and durability configuration. The repository contains repeatable BenchmarkDotNet coverage in [`BenchmarkTests.cs`](https://github.com/EryriSoftware/FileDistributedCache/blob/main/src/Extensions.Caching.FileSystem.Tests/Performance/BenchmarkTests.cs).
 
-Benchmarks compare Eryri against alternative IDistributedCache implementations using consistent workloads, allowing you to evaluate read latency, write latency and the cost of maintaining a full cache.
+The benchmark suite compares several `IDistributedCache` implementations and exercises both unconstrained and capacity-constrained Eryri configurations. Run the benchmarks on your target hardware and workload before making capacity or latency commitments. Published numbers are directional evidence, not a performance guarantee.
 
-The most meaningful benchmark is **sustained operation under realistic workloads with a full cache**. This measures the cost of maintaining the cache under continuous writes, rather than simply adding entries to an empty directory.
+The benchmark workload currently uses 4 KiB payloads, 10,000 initial entries, 100 parallel operations, five iterations, and one warmup iteration.
 
-Since the other libraries do not evict entries before inserting new ones, all implementations were benchmarked with pre-populated entries and no configured size limit, ensuring a consistent comparison.
+### Published results
 
-These results provide useful directional evidence, not a guarantee of performance across different machines or environments.
+The following results are the supplied BenchmarkDotNet output for the workload described above. Use these figures as directional evidence and rerun the benchmarks on the target environment before making capacity or latency commitments.
 
-- PayloadSize=4KiB
-- InitialEntries=10000
-- ParallelOperations=100
-- InvocationCount=30
-- IterationCount=5
-- UnrollFactor=1  
-- WarmupCount=1
+Times are in microseconds (`us`). Allocated memory is per operation. `1 ms = 1,000 us` and `1 us = 1,000 ns`.
 
-Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDistributedCache/blob/main/src/Extensions.Caching.FileSystem.Tests/Performance/BenchmarkTests.cs)
-> 1s == 1000ms, 1ms == 1000us, 1us == 1000ns
-
-### [Eryri.FileDistributedCache](https://www.nuget.org/packages/Eryri.FileDistributedCache)
+#### Eryri.FileDistributedCache - unbounded
 | Method                      | Mean        | Error       | StdDev     | Gen0   | Allocated |
 |---------------------------- |------------:|------------:|-----------:|-------:|----------:|
 | SetNewKey                   |  65.3670 us |  17.2505 us |  4.4799 us |      - |     968 B |
@@ -284,7 +256,9 @@ Tests located here: [BenchmarkTests.cs](https://github.com/EryriSoftware/FileDis
 | GetBufferedMissAsync        |   0.4744 us |   0.1044 us |  0.0271 us |      - |      51 B |
 | SetGetExistingKeyAsync      | 147.0018 us | 142.0474 us | 36.8893 us | 1.0000 |    6641 B |
 
-Here is an additional test run where a cache limit is applied and is running at capacity, showing the benchmark for when items must be evicted before adding new entries.
+#### Eryri.FileDistributedCache - capacity constrained
+
+This run measures Eryri with capacity enforcement and eviction enabled. It is not directly equivalent to the unbounded run because the cache performs additional capacity work.
 
 | Method                      | Mean        | Error       | StdDev     | Gen0   | Allocated |
 |---------------------------- |------------:|------------:|-----------:|-------:|----------:|
@@ -297,8 +271,10 @@ Here is an additional test run where a cache limit is applied and is running at 
 | SetExistingKeyAsync         | 111.8476 us |  95.2294 us | 24.7308 us |      - |    1499 B |
 | SetExistingKeyBufferedAsync | 109.8693 us | 139.6308 us | 36.2617 us |      - |    1855 B |
 
+#### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
 
-### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
+This is a comparison run from the same benchmark harness. It is included for context, not as a universal ranking across all workloads.
+
 | Method                      | Mean       | Error       | StdDev     | Gen0   | Gen1   | Allocated |
 |---------------------------- |-----------:|------------:|-----------:|-------:|-------:|----------:|
 | SetNewKey                   | 114.975 us |  25.5473 us |  6.6345 us | 0.6667 | 0.3333 |   6.72 KB |
@@ -319,12 +295,10 @@ Here is an additional test run where a cache limit is applied and is running at 
 | GetBufferedMissAsync        |   3.754 us |   0.7176 us |  0.1864 us |      - |      - |   2.15 KB |
 | SetGetExistingKeyAsync      | 272.297 us |   8.1186 us |  2.1084 us | 3.0000 | 1.0000 |  21.54 KB |
 
-> [!Warning]
-> - Capacity enforcement is eventual rather than strict.
-> - Write operations do not check MaxTotalSize or MaxEntries before publishing entries.
-> - Eviction is performed by a periodic scan; LRU is the supported policy in the reviewed implementation.
+> The comparison implementations do not necessarily provide the same feature set. In particular, their capacity behavior and eviction semantics differ; compare the capabilities you need, not only the mean latency.
 
-### [NeoSmart.Caching.Sqlite](https://www.nuget.org/packages/NeoSmart.Caching.Sqlite)
+#### [NeoSmart.Caching.Sqlite](https://www.nuget.org/packages/NeoSmart.Caching.Sqlite)
+
 | Method                      | Mean        | Error      | StdDev     | Gen0   | Allocated |
 |---------------------------- |------------:|-----------:|-----------:|-------:|----------:|
 | SetNewKey                   |   124.60 us |  19.429 us |   5.046 us |      - |   1.49 KB |
@@ -337,28 +311,36 @@ Here is an additional test run where a cache limit is applied and is running at 
 | GetMissAsync                |    50.34 us |   2.605 us |   0.677 us |      - |   1.47 KB |
 | SetGetExistingKeyAsync      | 1,463.27 us | 112.902 us |  17.472 us | 0.6667 |   7.04 KB |
 
-> [!Warning]
-> - Does not implement IBufferDistributedCache.
-> - The reviewed implementation does not provide a configurable disk-usage or maximum-cache-size limit.
+> NeoSmart.Caching.Sqlite did not implement `IBufferDistributedCache` in this benchmark and did not provide a configurable disk-usage or maximum-cache-size limit in the reviewed configuration. These are capability differences, not just performance differences.
 
-### [LiteDb.Extensions.Caching](https://www.nuget.org/packages/LiteDb.Extensions.Caching)
+## API and compatibility
 
-> [!Warning]
-> - Does not implement IBufferDistributedCache.
-> - The reviewed implementation does not provide a configurable disk-usage or maximum-cache-size limit.
-> - Can not overwrite an existing key without deleting it first.
+- `IDistributedCache` support for existing .NET cache integrations.
+- `IBufferDistributedCache` support for lower-allocation buffer-based access.
+- Dependency injection registration through `AddDistributedFileCache`.
+- `HybridCache` secondary-tier integration through the standard `IDistributedCache` registration.
+- Native AOT and trimming compatibility are enabled in the package project.
+- MIT licensed.
 
-### [Caching.FileBackedDistributedCache](https://www.nuget.org/packages/Caching.FileBackedDistributedCache)
+## Frequently asked questions
 
-> [!Warning]
-> - Does not implement IBufferDistributedCache.
-> - The reviewed implementation does not provide a configurable disk-usage or maximum-cache-size limit.
-> - Expired entries are treated as cache misses, but their files are not automatically deleted; disk usage can therefore grow over time.
-> - Requires Windows OS.
+### Is this a local Redis alternative?
 
-### [Net.DistributedFileStoreCache](https://www.nuget.org/packages/Net.DistributedFileStoreCache)
+It is an alternative when one process needs a bounded local cache without a Redis server. It is not a protocol-compatible Redis server and does not provide shared state between replicas.
 
-> [!Warning]
-> - Does not implement IBufferDistributedCache.
-> - Retains the entire cache in-memory. The filesystem is used as persistance/distribution mechanism.
-> - Does not support SlidingExpiration.
+### Is it really distributed because it implements `IDistributedCache`?
+
+No. `IDistributedCache` is the .NET abstraction used for integration. Eryri stores data in the local process and local filesystem only.
+
+### Does persistence guarantee that every cached value survives?
+
+No. Persistence supports recovery across normal restarts, but cache misses and data loss remain valid outcomes. Keep a source of truth.
+
+### Does it automatically move memory-cache entries to disk?
+
+No. Configure Eryri as the `IDistributedCache` secondary tier for `HybridCache`; it does not automatically spill arbitrary existing memory-cache entries to disk.
+
+### Is it suitable for multiple application replicas?
+
+Only as an independent cache per replica. Use a shared cache backend when replicas must observe the same entries.
+
