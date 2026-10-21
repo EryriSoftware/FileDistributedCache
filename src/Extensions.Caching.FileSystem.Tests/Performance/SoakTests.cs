@@ -13,6 +13,7 @@ public class SoakTests
     protected const int PayloadSize = 1;
     protected const int CacheSizeLimit = PayloadSize * 10;
     protected readonly byte[] Payload = RandomNumberGenerator.GetBytes(PayloadSize);
+    private static CancellationToken CancellationToken => TestContext.CurrentContext.CancellationToken;
 
     [Test]
     public void Set_Has_No_Conficts([Values] EvictionPolicy evictionPolicy)
@@ -60,7 +61,7 @@ public class SoakTests
 
         // Act
         // Assert
-        await Parallel.ForAsync(0, EntriesCount, TestContext.CurrentContext.CancellationToken, async (i, ct) =>
+        await Parallel.ForAsync(0, EntriesCount, CancellationToken, async (i, ct) =>
         {
             var key = Guid.NewGuid().ToString("N");
             await Task.WhenAll([
@@ -74,5 +75,36 @@ public class SoakTests
                 ctx.BufferCache.TryGetAsync(key, buffer, ct).AsTask()
             ]);
         });
+    }
+
+    [Test]
+    public async Task SetGet_Concurrent_Same_Key([Values] EvictionPolicy evictionPolicy)
+    {
+        // Arrange
+        var key = Guid.NewGuid().ToString("N");
+        using var ctx = new CacheContext(evictionPolicy: evictionPolicy, sizeLimitBytes: CacheSizeLimit);
+        var options = new DistributedCacheEntryOptions
+        {
+            AbsoluteExpiration = ctx.Now.AddDays(1)
+        };
+
+        await ctx.Cache.SetAsync(key, Payload, options, CancellationToken);
+
+        // Act
+        // Assert
+        var setTasks = Parallel.ForAsync(0, 100, CancellationToken, async (i, ct) =>
+        {
+            await ctx.Cache.SetAsync(key, Payload, options, ct);
+        });
+
+        var getTasks = Parallel.ForAsync(0, 100, CancellationToken, async (i, ct) =>
+        {
+            if (await ctx.Cache.GetAsync(key, ct) == null)
+            {
+                throw new MissingMemberException();
+            }
+        });
+
+        await Task.WhenAll(setTasks, getTasks);
     }
 }

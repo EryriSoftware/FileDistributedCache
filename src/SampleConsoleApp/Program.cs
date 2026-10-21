@@ -10,7 +10,7 @@ using var services = new ServiceCollection()
 
 var cache = services.GetRequiredService<HybridCache>();
 var key = Guid.NewGuid().ToString("N");
-var payload = Guid.NewGuid().ToString("N");
+var payload = "FileDistributedCache can write and read";
 var options = new HybridCacheEntryOptions
 {
     Expiration = TimeSpan.FromMinutes(10),
@@ -20,14 +20,11 @@ var options = new HybridCacheEntryOptions
 
 // Act
 await cache.SetAsync(key, payload, options);
-var actual = await cache.GetOrCreateAsync(key, _ => ValueTask.FromResult(string.Empty), options);
+var actual = await cache.GetOrCreateAsync(key, _ => ValueTask.FromResult("Cache miss"), options);
 
 // Assert
+Console.WriteLine(actual);
 if (actual != payload)
 {
     throw new Exception("FileDistributedCache write value is not the same as the read value");
-}
-else
-{
-    Console.WriteLine("FileDistributedCache can write and read");
 }

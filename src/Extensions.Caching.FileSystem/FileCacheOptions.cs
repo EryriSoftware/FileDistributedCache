@@ -9,12 +9,6 @@ public record FileCacheOptions
     private const int BytesPerGiB = 1 << 30;
 
     /// <summary>
-    /// Gets or sets the minimum length of time between removing expired items.
-    /// Zero or negative will result in the next execution being scheduled for the next shortest TTL.
-    /// </summary>
-    public TimeSpan ExpirationScanFrequency { get; set; } = TimeSpan.Zero;
-
-    /// <summary>
     /// Gets or sets the eviction policy used when reducing the number of cached files beyond already expired items.
     /// </summary>
     public EvictionPolicy EvictionPolicy { get; set; } = EvictionPolicy.LRU;

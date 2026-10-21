@@ -1,5 +1,4 @@
-﻿using System.Buffers;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using Eryri.Extensions.Caching.FileSystem.Tests.Contexts;
 using FluentAssertions;
 using Microsoft.Extensions.Caching.Distributed;
