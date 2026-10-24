@@ -1,38 +1,94 @@
-﻿using System.Collections.Concurrent;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 
 namespace Eryri.Extensions.Caching.FileSystem.Domain;
 
-internal class ConcurrentPriorityQueue<TElement, TPriority>
+internal sealed class ConcurrentPriorityQueue<TElement, TPriority>
+    where TElement : notnull
 {
-    private readonly object sync = new ();
-    private readonly ConcurrentQueue<(TElement Element, TPriority Priority)> pending = new ();
-    private readonly PriorityQueue<TElement, TPriority> queue = new PriorityQueue<TElement, TPriority>();
+    private readonly record struct Entry(
+        TElement Key,
+        TPriority Value,
+        ulong Sequence);
 
-    public void Enqueue(TElement element, TPriority priority)
+    private readonly Dictionary<TElement, Entry> _byKey;
+    private readonly SortedSet<Entry> _byValue;
+    private readonly object _gate = new();
+
+    private ulong _nextSequence;
+
+    public ConcurrentPriorityQueue(
+        IComparer<TPriority>? valueComparer = null,
+        IEqualityComparer<TElement>? keyComparer = null)
     {
-        pending.Enqueue((element, priority));
+        _byKey = new Dictionary<TElement, Entry>(keyComparer);
+
+        valueComparer ??= Comparer<TPriority>.Default;
+
+        _byValue = new SortedSet<Entry>(
+            Comparer<Entry>.Create((a, b) =>
+            {
+                int result = valueComparer.Compare(a.Value, b.Value);
+
+                return result != 0
+                    ? result
+                    : a.Sequence.CompareTo(b.Sequence);
+            }));
     }
 
-    public bool TryDequeue([MaybeNullWhen(false)] out TElement element)
+    internal void Enqueue(TElement key, TPriority value)
     {
-        lock (sync)
+        lock (_gate)
         {
-            while (pending.TryDequeue(out var item))
+            if (_byKey.TryGetValue(key, out var existing))
             {
-                queue.Enqueue(item.Element, item.Priority);
+                _byValue.Remove(existing);
             }
 
-            return queue.TryDequeue(out element, out _);
+            var entry = new Entry(key, value, Interlocked.Increment(ref _nextSequence));
+
+            _byKey[key] = entry;
+            _byValue.Add(entry);
         }
     }
 
-    public void Clear()
+    internal bool Remove(TElement key)
     {
-        lock (sync)
+        lock (_gate)
         {
-            pending.Clear();
-            queue.Clear();
+            return _byKey.Remove(key, out var entry) && _byValue.Remove(entry);
+        }
+    }
+
+    internal bool TryDequeue(
+        [MaybeNullWhen(false)] out TElement key,
+        [MaybeNullWhen(false)] out TPriority value)
+    {
+        lock (_gate)
+        {
+            if (_byValue.Count == 0)
+            {
+                key = default;
+                value = default;
+                return false;
+            }
+
+            var entry = _byValue.Min!;
+
+            _byValue.Remove(entry);
+            _byKey.Remove(entry.Key, out _);
+
+            key = entry.Key;
+            value = entry.Value;
+            return true;
+        }
+    }
+
+    internal void Clear()
+    {
+        lock (_gate)
+        {
+            _byKey.Clear();
+            _byValue.Clear();
         }
     }
 }

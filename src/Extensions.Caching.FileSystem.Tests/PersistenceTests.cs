@@ -9,56 +9,14 @@ namespace Eryri.Extensions.Caching.FileSystem.Tests;
 internal class PersistenceTests
 {
     private static CancellationToken CancellationToken => TestContext.CurrentContext.CancellationToken;
-
-    [Test]
-    public async Task Is_Persistant_With_WAL()
+    private static IEnumerable<TestCaseData> TestCases()
     {
-        // Arrange
-        var keys = Enumerable.Range(0, 1000).Select(d => Guid.NewGuid().ToString("N")).ToArray();
-        var directory = Directory.CreateTempSubdirectory();
-        var payload = RandomNumberGenerator.GetBytes(10);
-
-        try
-        {
-            using (var ctx = new CacheContext(cacheDirectory: directory.FullName))
-            {
-                var options = new DistributedCacheEntryOptions
-                {
-                    AbsoluteExpiration = ctx.Now.AddDays(1000),
-                    SlidingExpiration = TimeSpan.FromDays(1000)
-                };
-
-                await Parallel.ForEachAsync(keys, CancellationToken, async (key, ct) =>
-                {
-                    // Act
-                    await ctx.Cache.SetAsync(key, payload, options, ct);
-                    var actual = await ctx.Cache.GetAsync(key, ct);
-
-                    // Assert
-                    actual.Should().BeEquivalentTo(payload);
-                });
-            }
-
-            using (var ctx = new CacheContext(cacheDirectory: directory.FullName))
-            {
-                await Parallel.ForEachAsync(keys, CancellationToken, async (key, ct) =>
-                {
-                    // Act
-                    var actual = await ctx.Cache.GetAsync(key, ct);
-
-                    // Assert
-                    actual.Should().BeEquivalentTo(payload);
-                });
-            }
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
+        yield return new TestCaseData(true).SetName("With Snapshot");
+        yield return new TestCaseData(false).SetName("With WAL");
     }
 
-    [Test]
-    public async Task Is_Persistant_With_Snapshot()
+    [TestCaseSource(nameof(TestCases))]
+    public async Task Is_Persistant(bool useSnapshot)
     {
         // Arrange
         var keys = Enumerable.Range(0, 1000).Select(d => Guid.NewGuid().ToString("N")).ToArray();
@@ -85,8 +43,11 @@ internal class PersistenceTests
                     actual.Should().BeEquivalentTo(payload);
                 });
 
-                ctx.Advance(TimeSpan.FromDays(1));
-                await Task.Delay(100);
+                if (useSnapshot)
+                {
+                    ctx.Advance(TimeSpan.FromDays(1));
+                    await Task.Delay(100);
+                }
             }
 
             using (var ctx = new CacheContext(cacheDirectory: directory.FullName))
