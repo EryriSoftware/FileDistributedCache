@@ -27,16 +27,10 @@ internal class PersistenceTests
         {
             using (var ctx = new CacheContext(cacheDirectory: directory.FullName))
             {
-                var options = new DistributedCacheEntryOptions
-                {
-                    AbsoluteExpiration = ctx.Now.AddDays(1000),
-                    SlidingExpiration = TimeSpan.FromDays(1000)
-                };
-
                 await Parallel.ForEachAsync(keys, CancellationToken, async (key, ct) =>
                 {
                     // Act
-                    await ctx.Cache.SetAsync(key, payload, options, ct);
+                    await ctx.Cache.SetAsync(key, payload, ct);
                     var actual = await ctx.Cache.GetAsync(key, ct);
 
                     // Assert
@@ -46,8 +40,9 @@ internal class PersistenceTests
                 if (useSnapshot)
                 {
                     ctx.Advance(TimeSpan.FromDays(1));
-                    await Task.Delay(100);
                 }
+
+                await Task.Delay(100);
             }
 
             using (var ctx = new CacheContext(cacheDirectory: directory.FullName))
