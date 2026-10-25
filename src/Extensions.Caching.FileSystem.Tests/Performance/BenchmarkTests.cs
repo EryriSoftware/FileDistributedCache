@@ -24,6 +24,7 @@ public class BenchmarkTests
     [TestCase(typeof(DNeoSmart_Caching_Sqlite_Benchmarks), TestName = "DNeoSmart_Caching_Sqlite")]
     [TestCase(typeof(LiteDb_Extensions_Caching_Benchmarks), TestName = "LiteDb_Extensions_Caching")]
     [TestCase(typeof(Caching_FileBackedDistributedCache_Benchmarks), TestName = "Caching_FileBackedDistributedCache")]
+    [TestCase(typeof(Net_DistributedFileStoreCache_Benchmarks), TestName = "Net_DistributedFileStoreCache")]
     public void Run_Benchmark(Type benchmarkType) => BenchmarkRunner.Run(benchmarkType, config);
 
     public class Eryri_FileDistributedCache_Benchmarks : Benchmarks
@@ -35,7 +36,7 @@ public class BenchmarkTests
         {
             services.AddDistributedFileCache(d =>
             {
-                d.SizeLimitBytes = RunAtCapacity ? InitialNumberOfItems * PayloadSize : null;
+                d.SizeLimitBytes = RunAtCapacity ? InitialSize : null;
                 d.CacheDirectory = cacheDirectory.FullName;
                 d.EvictionPolicy = EvictionPolicy.TTL;
             });
@@ -90,12 +91,30 @@ public class BenchmarkTests
         }
     }
 
+    public class Net_DistributedFileStoreCache_Benchmarks : Benchmarks
+    {
+        [ParamsAllValues]
+        public bool RunAtCapacity;
+
+        public Net_DistributedFileStoreCache_Benchmarks()
+        {
+            Net.DistributedFileStoreCache.RegisterDistributedFileStoreCache.AddDistributedFileStoreCache(services, d =>
+            {
+                d.PathToCacheFileDirectory = cacheDirectory.FullName;
+                d.SecondPartOfCacheFileName = "cache";
+                d.MaxBytesInJsonCacheFile = RunAtCapacity ? InitialSize : 10000;
+                d.WhichVersion = Net.DistributedFileStoreCache.FileStoreCacheVersions.IDistributedCache;
+            });
+        }
+    }
+
     [MemoryDiagnoser]
     [ShortRunJob]
     public abstract class Benchmarks : IDisposable
     {
         public const int ParallelOperations = 100;
         public const int InitialNumberOfItems = 100;
+        public const int InitialSize = InitialNumberOfItems * PayloadSize;
         public const int PayloadSize = 4 << 10; // 4 KiB
         protected readonly DirectoryInfo cacheDirectory = Directory.CreateTempSubdirectory();
         private readonly string key = Guid.NewGuid().ToString("N");
@@ -104,8 +123,7 @@ public class BenchmarkTests
         protected readonly DistributedCacheEntryOptions cacheEntryOptions = new DistributedCacheEntryOptions
         {
             AbsoluteExpiration = DateTimeOffset.UtcNow.AddDays(2),
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1),
-            SlidingExpiration = TimeSpan.FromMinutes(10)
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1)
         };
         protected readonly IServiceCollection services = new ServiceCollection();
         private IDisposable? disposable;
@@ -232,7 +250,7 @@ public class BenchmarkTests
             {
                 if (cache!.Get(key) == null)
                 {
-                    throw new MissingMemberException();
+                    throw new MissingMemberException("Expected a cache hit.");
                 }
             });
         }
@@ -245,7 +263,7 @@ public class BenchmarkTests
                 using var buffer = new ArrayPoolBufferWriter<byte>(payload.Length);
                 if (!bufferedCache!.TryGet(key, buffer))
                 {
-                    throw new MissingMemberException();
+                    throw new MissingMemberException("Expected a cache hit.");
                 }
             });
         }
@@ -257,7 +275,7 @@ public class BenchmarkTests
             {
                 if (await cache!.GetAsync(key, ct) == null)
                 {
-                    throw new MissingMemberException();
+                    throw new MissingMemberException("Expected a cache hit.");
                 }
             });
         }
@@ -270,7 +288,7 @@ public class BenchmarkTests
                 using var buffer = new ArrayPoolBufferWriter<byte>(payload.Length);
                 if (!await bufferedCache!.TryGetAsync(key, buffer, ct))
                 {
-                    throw new MissingMemberException();
+                    throw new MissingMemberException("Expected a cache hit.");
                 }
             });
         }
@@ -337,7 +355,7 @@ public class BenchmarkTests
             {
                 if (await cache!.GetAsync(key, ct) == null)
                 {
-                    throw new MissingMemberException();
+                    throw new MissingMemberException("Expected a cache hit.");
                 }
             });
 

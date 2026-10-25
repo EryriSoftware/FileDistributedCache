@@ -308,6 +308,22 @@ This is a comparison run from the same benchmark harness. It is included for con
 
 > NeoSmart.Caching.Sqlite did not implement `IBufferDistributedCache` in this benchmark and did not provide a configurable disk-usage or maximum-cache-size limit in the reviewed configuration. These are capability differences, not just performance differences.
 
+#### [Net.DistributedFileStoreCache](https://www.nuget.org/packages/Net.DistributedFileStoreCache)
+
+| Method                      | Mean          | Error         | StdDev      | Median        | Gen0    | Allocated |
+|---------------------------- |--------------:|--------------:|------------:|--------------:|--------:|----------:|
+| SetNewKey                   | 1,692.5027 us | 2,989.2890 us | 163.8530 us | 1,706.2090 us | 30.0000 |  131143 B |
+| SetNewKeyAsync              | 1,477.1450 us | 1,852.7051 us | 101.5530 us | 1,532.5170 us | 30.0000 |  132514 B |
+| SetExistingKey              | 1,755.6110 us | 1,764.4957 us |  96.7180 us | 1,708.7730 us | 30.0000 |  130005 B |
+| SetExistingKeyAsync         | 1,580.7233 us | 1,356.8385 us |  74.3729 us | 1,540.8380 us | 30.0000 |  129785 B |
+| Get                         |            NA |            NA |          NA |            NA |      NA |        NA |
+| GetAsync                    |            NA |            NA |          NA |            NA |      NA |        NA |
+| GetMiss                     |     0.6120 us |     5.0979 us |   0.2794 us |     0.5940 us |       - |      20 B |
+| GetMissAsync                |     0.7813 us |     2.7053 us |   0.1483 us |     0.7320 us |       - |      58 B |
+| SetGetExistingKeyAsync      |            NA |            NA |          NA |            NA |      NA |        NA |
+
+> Net.DistributedFileStoreCache did not implement `IBufferDistributedCache` in this benchmark and did not provide reliable retrieval of stored entries. These are capability differences, not just performance differences.
+
 ## API and compatibility
 
 - `IDistributedCache` support for existing .NET cache integrations.
