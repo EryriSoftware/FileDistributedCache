@@ -1,4 +1,5 @@
 ﻿using System.Buffers;
+using System.Runtime.CompilerServices;
 using Eryri.Buffers.Extensions;
 using Eryri.Extensions.Caching.FileSystem.Models;
 
@@ -25,7 +26,10 @@ internal static class BufferWriterExtensions
         writer.Write(value.SlidingExpirationTicks);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Write(this IBufferWriter<byte> writer, int value) => Buffers.Extensions.BufferWriterExtensions.Write(writer, value); // Provide valid signature for int
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Write(this IBufferWriter<byte> writer, long value) => Buffers.Extensions.BufferWriterExtensions.Write(writer, value); // Provide valid signature for long
     public static void Write(this IBufferWriter<byte> writer, long? value)
     {

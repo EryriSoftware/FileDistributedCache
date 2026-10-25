@@ -55,14 +55,9 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                 destination.ReadFile(entry.Path);
                 return true;
             }
-            catch (FileNotFoundException)
+            catch (IOException)
             {
                 // The entry was replaced; retry the manifest lookup.
-            }
-            catch (Exception ex)
-            {
-                logger?.LogCritical(ex, "Failed to read cache file");
-                return false;
             }
         }
 
@@ -78,14 +73,9 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             {
                 return File.ReadAllBytes(entry.Path);
             }
-            catch (FileNotFoundException)
+            catch (IOException)
             {
                 // The entry was replaced; retry the manifest lookup.
-            }
-            catch (Exception ex)
-            {
-                logger?.LogCritical(ex, "Failed to read cache file");
-                return null;
             }
         }
 
@@ -102,14 +92,9 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                 await destination.ReadFileAsync(entry.Path, cancellationToken);
                 return true;
             }
-            catch (FileNotFoundException)
+            catch (IOException)
             {
                 // The entry was replaced; retry the manifest lookup.
-            }
-            catch (Exception ex)
-            {
-                logger?.LogCritical(ex, "Failed to read cache file");
-                return false;
             }
         }
 
@@ -125,14 +110,9 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             {
                 return await File.ReadAllBytesAsync(entry.Path, cancellationToken);
             }
-            catch (FileNotFoundException)
+            catch (IOException)
             {
                 // The entry was replaced; retry the manifest lookup.
-            }
-            catch (Exception ex)
-            {
-                logger?.LogCritical(ex, "Failed to read cache file");
-                return null;
             }
         }
 
@@ -220,7 +200,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         {
             if (manifest.TryUpdate(key, entry, timeProvider.GetUtcNow().UtcTicks, isAccessed, out var newEntry))
             {
-                var _ = persistance.Update(newEntry, CancellationToken.None);
+                persistance.Update(newEntry);
                 QueueCleanup(newEntry.ExpirationTicks);
                 return;
             }
@@ -240,7 +220,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         if (manifest.TryRemove(key, out var entry))
         {
-            var _ = persistance.Delete(entry, CancellationToken.None);
+            persistance.Delete(entry);
             TryDelete(entry.Path);
         }
     }
@@ -255,7 +235,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         if (manifest.TryRemove(entry))
         {
-            var _ = persistance.Delete(entry, CancellationToken.None);
+            persistance.Delete(entry);
             TryDelete(entry.Path);
             return true;
         }
@@ -328,7 +308,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             TryDelete(existing.Path);
         }
 
-        var _ = persistance.Insert(entry, CancellationToken.None);
+        persistance.Insert(entry);
         QueueCleanup(entry.ExpirationTicks);
     }
 

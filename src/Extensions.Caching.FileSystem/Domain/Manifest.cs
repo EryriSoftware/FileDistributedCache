@@ -12,11 +12,11 @@ internal class Manifest(IOptions<FileCacheOptions> options)
     public long Size => Volatile.Read(ref _size);
     public int Count => files.Count;
     public ICollection<Metadata> Values => files.Values;
-    private readonly ConcurrentDictionary<string, Metadata> files = new (StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentPriorityQueue<PriorityCandidate, SequencedValue<long>> lruQueue = new ();
-    private readonly ConcurrentPriorityQueue<PriorityCandidate, ulong> lfuQueue = new ();
-    private readonly ConcurrentPriorityQueue<PriorityCandidate, long> ttlQueue = new ();
-    private readonly ConcurrentQueue<PriorityCandidate> fifoQueue = new ();
+    private readonly ConcurrentDictionary<string, Metadata> files = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentPriorityQueue<string, long> lruQueue = new();
+    private readonly ConcurrentPriorityQueue<string, ulong> lfuQueue = new();
+    private readonly ConcurrentPriorityQueue<string, long> ttlQueue = new();
+    private readonly ConcurrentQueue<string> fifoQueue = new();
 
     public void Clear()
     {
@@ -79,6 +79,7 @@ internal class Manifest(IOptions<FileCacheOptions> options)
     {
         if (files.TryRemove(new KeyValuePair<string, Metadata>(value.Key, value)))
         {
+            Dequeue(value);
             Interlocked.Add(ref _size, -value.SizeBytes);
             return true;
         }
@@ -116,29 +117,47 @@ internal class Manifest(IOptions<FileCacheOptions> options)
 
     private void Enqueue(Metadata value, Metadata? comparisonValue)
     {
-        var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
-        if (value.ExpirationTicks.HasValue)
-        {
-            ttlQueue.Enqueue(candidate, value.ExpirationTicks.Value);
-        }
+        EnqueueTtl(value);
 
         switch (policy)
         {
             case EvictionPolicy.TTL:
                 break; // TTL queue is always tracked
             case EvictionPolicy.LRU:
-                lruQueue.Enqueue(candidate, new SequencedValue<long>(value.LastAccessTicks));
+                lruQueue.Enqueue(value.Key, value.LastAccessTicks);
                 break;
             case EvictionPolicy.LFU:
-                lfuQueue.Enqueue(candidate, value.AccessCount);
+                lfuQueue.Enqueue(value.Key, value.AccessCount);
 
                 break;
             case EvictionPolicy.FIFO:
                 if (comparisonValue == null)
                 {
-                    fifoQueue.Enqueue(candidate);
+                    fifoQueue.Enqueue(value.Key);
                 }
 
+                break;
+            default:
+                throw new NotImplementedException(policy.ToString());
+        }
+    }
+
+    private void Dequeue(Metadata value)
+    {
+        ttlQueue.Remove(value.Key);
+
+        switch (policy)
+        {
+            case EvictionPolicy.TTL:
+                break; // TTL queue is always tracked
+            case EvictionPolicy.LRU:
+                lruQueue.Remove(value.Key);
+                break;
+            case EvictionPolicy.LFU:
+                lfuQueue.Remove(value.Key);
+                break;
+            case EvictionPolicy.FIFO:
+                fifoQueue.Enqueue(value.Key);
                 break;
             default:
                 throw new NotImplementedException(policy.ToString());
@@ -149,17 +168,16 @@ internal class Manifest(IOptions<FileCacheOptions> options)
     {
         if (value.ExpirationTicks.HasValue)
         {
-            var candidate = new PriorityCandidate(Key: value.Key, Version: value.Version);
-            ttlQueue.Enqueue(candidate, value.ExpirationTicks.Value);
+            ttlQueue.Enqueue(value.Key, value.ExpirationTicks.Value);
         }
     }
 
-    private bool TryDequeueCandidate(EvictionPolicy policy, out PriorityCandidate candidate) =>
+    private bool TryDequeueCandidate(EvictionPolicy policy, [MaybeNullWhen(false)] out string candidate) =>
         policy switch
         {
-            EvictionPolicy.TTL => ttlQueue.TryDequeue(out candidate),
-            EvictionPolicy.LRU => lruQueue.TryDequeue(out candidate),
-            EvictionPolicy.LFU => lfuQueue.TryDequeue(out candidate),
+            EvictionPolicy.TTL => ttlQueue.TryDequeue(out candidate, out _),
+            EvictionPolicy.LRU => lruQueue.TryDequeue(out candidate, out _),
+            EvictionPolicy.LFU => lfuQueue.TryDequeue(out candidate, out _),
             EvictionPolicy.FIFO => fifoQueue.TryDequeue(out candidate),
             _ => throw new NotImplementedException(policy.ToString())
         };
@@ -168,8 +186,7 @@ internal class Manifest(IOptions<FileCacheOptions> options)
     {
         while (TryDequeueCandidate(policy, out var candidate))
         {
-            if (files.TryGetValue(candidate.Key, out var current) &&
-                (policy == EvictionPolicy.FIFO || candidate.Version == current.Version))
+            if (files.TryGetValue(candidate, out var current))
             {
                 value = current;
                 return true;

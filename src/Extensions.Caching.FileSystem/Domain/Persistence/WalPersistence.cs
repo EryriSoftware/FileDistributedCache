@@ -25,12 +25,12 @@ internal class WalPersistence : WriteAheadLog<Mutation>, IPersistence
         snapshotSchedule = timeProvider.CreateTimer(_ => SaveSnapshotAsync().GetAwaiter().GetResult(), null, options.Value.SnapshotInterval, options.Value.SnapshotInterval);
     }
 
-    public ValueTask Insert(Metadata value, CancellationToken cancellationToken) =>
-        AppendAsync(new Mutation(MutationType.Insert, value), cancellationToken);
-    public ValueTask Update(Metadata value, CancellationToken cancellationToken) =>
-        AppendAsync(new Mutation(MutationType.Update, value), cancellationToken);
-    public ValueTask Delete(Metadata value, CancellationToken cancellationToken) =>
-        AppendAsync(new Mutation(MutationType.Delete, value), cancellationToken);
+    public async void Insert(Metadata value) =>
+        await AppendAsync(new Mutation(MutationType.Insert, value), CancellationToken.None);
+    public async void Update(Metadata value) =>
+        await AppendAsync(new Mutation(MutationType.Update, value), CancellationToken.None);
+    public async void Delete(Metadata value) =>
+        await AppendAsync(new Mutation(MutationType.Delete, value), CancellationToken.None);
 
     protected override ValueTask ApplyAsync(Mutation mutation, CancellationToken cancellationToken)
     {
@@ -74,7 +74,7 @@ internal class WalPersistence : WriteAheadLog<Mutation>, IPersistence
     {
         await base.InitializeAsync(cancellationToken);
         var paths = manifest.Values.Select(x => x.Path).ToHashSet();
-        var allFiles = directoryOwner.Directory.GetFiles("*bytes", new EnumerationOptions { RecurseSubdirectories = true });
+        var allFiles = directoryOwner.Directory.EnumerateFiles("*.bytes", new EnumerationOptions { RecurseSubdirectories = true });
 
         foreach (var file in allFiles)
         {

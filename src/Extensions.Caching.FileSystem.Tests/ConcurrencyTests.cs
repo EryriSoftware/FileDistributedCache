@@ -2,16 +2,17 @@
 using System.Security.Cryptography;
 using Eryri.Buffers;
 using Eryri.Extensions.Caching.FileSystem.Tests.Contexts;
+using FluentAssertions;
 using Microsoft.Extensions.Caching.Distributed;
 
-namespace Eryri.Extensions.Caching.FileSystem.Tests.Performance;
+namespace Eryri.Extensions.Caching.FileSystem.Tests;
 
 [TestFixture, Parallelizable(ParallelScope.All)]
-public class SoakTests
+public class ConcurrencyTests
 {
-    protected const int EntriesCount = 1000;
-    protected const int PayloadSize = 1;
-    protected const int CacheSizeLimit = PayloadSize * 10;
+    protected const int EntriesCount = 100;
+    protected const int PayloadSize = 10;
+    protected const int CacheSizeLimit = PayloadSize * EntriesCount;
     protected readonly byte[] Payload = RandomNumberGenerator.GetBytes(PayloadSize);
     private static CancellationToken CancellationToken => TestContext.CurrentContext.CancellationToken;
 
@@ -25,7 +26,7 @@ public class SoakTests
             AbsoluteExpiration = ctx.Now.AddDays(1)
         };
 
-        Parallel.For(0, 10, i =>
+        Parallel.For(0, EntriesCount, i =>
         {
             ctx.Cache.Set(Guid.NewGuid().ToString("N"), Payload, options);
         });
@@ -38,9 +39,10 @@ public class SoakTests
             ctx.Cache.Set(key, Payload, options);
             ctx.BufferCache.Set(key, new ReadOnlySequence<byte>(Payload), options);
 
-            ctx.Cache.Get(key);
+            ctx.Cache.Get(key).Should().BeEquivalentTo(Payload);
             using var buffer = new ArrayPoolBufferWriter<byte>(Payload.Length);
-            ctx.BufferCache.TryGet(key, buffer);
+            ctx.BufferCache.TryGet(key, buffer).Should().BeTrue();
+            buffer.WrittenSpan.ToArray().Should().BeEquivalentTo(Payload);
         });
     }
 
@@ -54,7 +56,7 @@ public class SoakTests
             AbsoluteExpiration = ctx.Now.AddDays(1)
         };
 
-        Parallel.For(0, 10, i =>
+        Parallel.For(0, EntriesCount, i =>
         {
             ctx.Cache.Set(Guid.NewGuid().ToString("N"), Payload, options);
         });
@@ -69,11 +71,20 @@ public class SoakTests
                 ctx.BufferCache.SetAsync(key, new ReadOnlySequence<byte>(Payload), options, ct).AsTask()
             ]);
 
-            using var buffer = new ArrayPoolBufferWriter<byte>(Payload.Length);
-            await Task.WhenAll([
-                ctx.Cache.GetAsync(key, ct),
-                ctx.BufferCache.TryGetAsync(key, buffer, ct).AsTask()
-            ]);
+            async Task ReadTask()
+            {
+                var actual = await ctx.Cache.GetAsync(key, ct);
+                actual.Should().BeEquivalentTo(Payload);
+            }
+
+            async Task ReadBufferTask()
+            {
+                using var buffer = new ArrayPoolBufferWriter<byte>(Payload.Length);
+                await ctx.BufferCache.TryGetAsync(key, buffer, ct);
+                buffer.WrittenSpan.ToArray().Should().BeEquivalentTo(Payload);
+            }
+
+            await Task.WhenAll(ReadTask(), ReadBufferTask());
         });
     }
 
@@ -92,17 +103,15 @@ public class SoakTests
 
         // Act
         // Assert
-        var setTasks = Parallel.ForAsync(0, 100, CancellationToken, async (i, ct) =>
+        var setTasks = Parallel.ForAsync(0, EntriesCount, CancellationToken, async (i, ct) =>
         {
             await ctx.Cache.SetAsync(key, Payload, options, ct);
         });
 
-        var getTasks = Parallel.ForAsync(0, 100, CancellationToken, async (i, ct) =>
+        var getTasks = Parallel.ForAsync(0, EntriesCount, CancellationToken, async (i, ct) =>
         {
-            if (await ctx.Cache.GetAsync(key, ct) == null)
-            {
-                throw new MissingMemberException();
-            }
+            var actual = await ctx.Cache.GetAsync(key, ct);
+            actual.Should().BeEquivalentTo(Payload);
         });
 
         await Task.WhenAll(setTasks, getTasks);
