@@ -74,7 +74,7 @@ internal class WalPersistence : WriteAheadLog<Mutation>, IPersistence
     {
         await base.InitializeAsync(cancellationToken);
         var paths = manifest.Values.Select(x => x.Path).ToHashSet();
-        var allFiles = directoryOwner.Directory.GetFiles("*bytes", new EnumerationOptions { RecurseSubdirectories = true });
+        var allFiles = directoryOwner.Directory.EnumerateFiles("*.bytes", new EnumerationOptions { RecurseSubdirectories = true });
 
         foreach (var file in allFiles)
         {
