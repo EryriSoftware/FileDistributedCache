@@ -9,7 +9,7 @@
 		<VerifyReferenceTrimCompatibility>true</VerifyReferenceTrimCompatibility>
 
 		<!-- NuGet Package Metadata -->
-		<Version>1.0.10</Version>
+		<Version>1.0.11</Version>
 		<PackageId>Eryri.FileDistributedCache</PackageId>
 		<Authors>Osian Linton</Authors>
 		<Description>Fast, bounded local filesystem cache and durable local store with IDistributedCache, IBufferDistributedCache, HybridCache integration, WAL recovery, expiration, and LRU, LFU, FIFO, or TTL eviction. Single-process and not replicated.</Description>
