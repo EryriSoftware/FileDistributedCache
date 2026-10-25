@@ -55,14 +55,9 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                 destination.ReadFile(entry.Path);
                 return true;
             }
-            catch (FileNotFoundException)
+            catch (IOException)
             {
                 // The entry was replaced; retry the manifest lookup.
-            }
-            catch (Exception ex)
-            {
-                logger?.LogCritical(ex, "Failed to read cache file");
-                return false;
             }
         }
 
@@ -78,14 +73,9 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             {
                 return File.ReadAllBytes(entry.Path);
             }
-            catch (FileNotFoundException)
+            catch (IOException)
             {
                 // The entry was replaced; retry the manifest lookup.
-            }
-            catch (Exception ex)
-            {
-                logger?.LogCritical(ex, "Failed to read cache file");
-                return null;
             }
         }
 
@@ -102,14 +92,9 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                 await destination.ReadFileAsync(entry.Path, cancellationToken);
                 return true;
             }
-            catch (FileNotFoundException)
+            catch (IOException)
             {
                 // The entry was replaced; retry the manifest lookup.
-            }
-            catch (Exception ex)
-            {
-                logger?.LogCritical(ex, "Failed to read cache file");
-                return false;
             }
         }
 
@@ -125,14 +110,9 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             {
                 return await File.ReadAllBytesAsync(entry.Path, cancellationToken);
             }
-            catch (FileNotFoundException)
+            catch (IOException)
             {
                 // The entry was replaced; retry the manifest lookup.
-            }
-            catch (Exception ex)
-            {
-                logger?.LogCritical(ex, "Failed to read cache file");
-                return null;
             }
         }
 
