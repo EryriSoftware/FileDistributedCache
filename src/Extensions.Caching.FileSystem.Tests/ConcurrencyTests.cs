@@ -5,10 +5,10 @@ using Eryri.Extensions.Caching.FileSystem.Tests.Contexts;
 using FluentAssertions;
 using Microsoft.Extensions.Caching.Distributed;
 
-namespace Eryri.Extensions.Caching.FileSystem.Tests.Performance;
+namespace Eryri.Extensions.Caching.FileSystem.Tests;
 
 [TestFixture, Parallelizable(ParallelScope.All)]
-public class SoakTests
+public class ConcurrencyTests
 {
     protected const int EntriesCount = 100;
     protected const int PayloadSize = 10;

@@ -9,7 +9,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Perfolizer.Horology;
 
-namespace Eryri.Extensions.Caching.FileSystem.Tests.Performance;
+namespace Eryri.Extensions.Caching.FileSystem.Tests;
 
 [TestFixture]
 public class BenchmarkTests
@@ -108,7 +108,14 @@ public class BenchmarkTests
     }
 
     [MemoryDiagnoser]
-    [ShortRunJob]
+    [MinColumn]
+    [MeanColumn]
+    [MedianColumn]
+    [SimpleJob(
+        launchCount: 1,
+        warmupCount: 3,
+        invocationCount: 1,
+        iterationCount: 3)]
     public abstract class Benchmarks : IDisposable
     {
         public const int ParallelOperations = 100;
