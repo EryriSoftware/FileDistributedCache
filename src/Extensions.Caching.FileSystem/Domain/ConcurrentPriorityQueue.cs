@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Eryri.Extensions.Caching.FileSystem.Domain;
 
@@ -10,7 +11,7 @@ internal sealed class ConcurrentPriorityQueue<TElement, TPriority>
         TPriority Value,
         ulong Sequence);
 
-    private readonly Dictionary<TElement, Entry> _byKey;
+    private readonly ConcurrentDictionary<TElement, Entry> _byKey;
     private readonly SortedSet<Entry> _byValue;
     private readonly object _gate = new();
 
@@ -20,11 +21,11 @@ internal sealed class ConcurrentPriorityQueue<TElement, TPriority>
         IComparer<TPriority>? valueComparer = null,
         IEqualityComparer<TElement>? keyComparer = null)
     {
-        _byKey = new Dictionary<TElement, Entry>(keyComparer);
+        _byKey = new(keyComparer);
 
         valueComparer ??= Comparer<TPriority>.Default;
 
-        _byValue = new SortedSet<Entry>(
+        _byValue = new(
             Comparer<Entry>.Create((a, b) =>
             {
                 int result = valueComparer.Compare(a.Value, b.Value);
@@ -37,26 +38,39 @@ internal sealed class ConcurrentPriorityQueue<TElement, TPriority>
 
     internal void Enqueue(TElement key, TPriority value)
     {
-        lock (_gate)
+        var entry = new Entry(key, value, Interlocked.Increment(ref _nextSequence));
+
+        _byKey.AddOrUpdate(key, _ =>
         {
-            if (_byKey.TryGetValue(key, out var existing))
+            lock (_gate)
             {
-                _byValue.Remove(existing);
+                _byValue.Add(entry);
             }
 
-            var entry = new Entry(key, value, Interlocked.Increment(ref _nextSequence));
+            return entry;
+        }, (_, existing) =>
+        {
+            lock (_gate)
+            {
+                _byValue.Remove(existing);
+                _byValue.Add(entry);
+            }
 
-            _byKey[key] = entry;
-            _byValue.Add(entry);
-        }
+            return entry;
+        });
     }
 
     internal bool Remove(TElement key)
     {
-        lock (_gate)
+        if (_byKey.TryRemove(key, out var entry))
         {
-            return _byKey.Remove(key, out var entry) && _byValue.Remove(entry);
+            lock (_gate)
+            {
+                return _byValue.Remove(entry);
+            }
         }
+
+        return false;
     }
 
     internal bool TryDequeue(
