@@ -200,7 +200,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         {
             if (manifest.TryUpdate(key, entry, timeProvider.GetUtcNow().UtcTicks, isAccessed, out var newEntry))
             {
-                var _ = persistance.Update(newEntry, CancellationToken.None);
+                persistance.Update(newEntry);
                 QueueCleanup(newEntry.ExpirationTicks);
                 return;
             }
@@ -220,7 +220,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         if (manifest.TryRemove(key, out var entry))
         {
-            var _ = persistance.Delete(entry, CancellationToken.None);
+            persistance.Delete(entry);
             TryDelete(entry.Path);
         }
     }
@@ -235,7 +235,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         if (manifest.TryRemove(entry))
         {
-            var _ = persistance.Delete(entry, CancellationToken.None);
+            persistance.Delete(entry);
             TryDelete(entry.Path);
             return true;
         }
@@ -308,7 +308,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             TryDelete(existing.Path);
         }
 
-        var _ = persistance.Insert(entry, CancellationToken.None);
+        persistance.Insert(entry);
         QueueCleanup(entry.ExpirationTicks);
     }
 

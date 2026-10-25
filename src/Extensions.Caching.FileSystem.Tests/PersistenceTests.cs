@@ -42,7 +42,7 @@ internal class PersistenceTests
                     ctx.Advance(TimeSpan.FromDays(1));
                 }
 
-                await Task.Delay(100);
+                await Task.Delay(100); // WAL is used as a fire&forget background process
             }
 
             using (var ctx = new CacheContext(cacheDirectory: directory.FullName))
