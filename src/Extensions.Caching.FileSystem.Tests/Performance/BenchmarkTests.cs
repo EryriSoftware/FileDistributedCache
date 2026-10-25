@@ -91,14 +91,11 @@ public class BenchmarkTests
     }
 
     [MemoryDiagnoser]
-    [SimpleJob(
-        warmupCount: 1,
-        iterationCount: 5,
-        invocationCount: 30)]
+    [ShortRunJob]
     public abstract class Benchmarks : IDisposable
     {
         public const int ParallelOperations = 100;
-        public const int InitialNumberOfItems = 10_000;
+        public const int InitialNumberOfItems = 100;
         public const int PayloadSize = 4 << 10; // 4 KiB
         protected readonly DirectoryInfo cacheDirectory = Directory.CreateTempSubdirectory();
         private readonly string key = Guid.NewGuid().ToString("N");
