@@ -19,5 +19,6 @@ public class BenchmarkTests
     [TestCase(typeof(LiteDb_Extensions_Caching_Benchmarks), TestName = "LiteDb_Extensions_Caching")]
     [TestCase(typeof(Caching_FileBackedDistributedCache_Benchmarks), TestName = "Caching_FileBackedDistributedCache")]
     [TestCase(typeof(Net_DistributedFileStoreCache_Benchmarks), TestName = "Net_DistributedFileStoreCache")]
+    [TestCase(typeof(StackExchange_Redis_Benchmarks), TestName = "StackExchange_Redis")]
     public void Run_Benchmark(Type benchmarkType) => BenchmarkRunner.Run(benchmarkType, config);
 }

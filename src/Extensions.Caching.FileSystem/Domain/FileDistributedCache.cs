@@ -1,6 +1,7 @@
 ﻿using System.Buffers;
 using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
+using System.Threading.Channels;
 using Eryri.Extensions.Caching.FileSystem.Domain.Persistence;
 using Eryri.Extensions.Caching.FileSystem.Extensions;
 using Eryri.Extensions.Caching.FileSystem.Models;
@@ -27,6 +28,13 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         this.manifest = manifest;
         this.persistance = persistance;
         cacheDirectory = directoryOwner.Directory;
+        deletionChannel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = false,
+            AllowSynchronousContinuations = false,
+        });
+        deletionConsumer = ProcessDeletesAsync(channelCancellationTokenSource.Token);
 
         persistance.InitializeAsync(CancellationToken.None);
         RemoveExpired();
@@ -42,6 +50,9 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     private readonly IPersistence persistance;
     private long nextCleanup = DateTimeOffset.MaxValue.UtcTicks;
     private readonly ITimer cleanupTimer;
+    private readonly Channel<string> deletionChannel;
+    private Task? deletionConsumer;
+    private CancellationTokenSource channelCancellationTokenSource = new();
 
     public long Size => manifest.Size;
 
@@ -243,18 +254,23 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         return false;
     }
 
-    private void TryDelete(string path)
+    private void TryDelete(string path) => deletionChannel.Writer.TryWrite(path);
+
+    private async Task ProcessDeletesAsync(CancellationToken cancellationToken)
     {
-        try
+        await foreach (var path in deletionChannel.Reader.ReadAllAsync(cancellationToken))
         {
-            if (File.Exists(path))
+            try
             {
-                File.Delete(path);
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
             }
-        }
-        catch (Exception ex)
-        {
-            logger?.LogWarning(ex, "Failed to delete cache file");
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "Failed to delete cache file");
+            }
         }
     }
 
@@ -374,6 +390,9 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         if (!isDisposed)
         {
             isDisposed = true;
+            deletionChannel.Writer.TryComplete();
+            channelCancellationTokenSource.Cancel();
+            channelCancellationTokenSource.Dispose();
             cleanupTimer.Dispose();
         }
     }

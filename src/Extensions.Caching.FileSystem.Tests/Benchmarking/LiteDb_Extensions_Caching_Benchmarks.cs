@@ -2,11 +2,12 @@
 
 public class LiteDb_Extensions_Caching_Benchmarks : Benchmarks
 {
-    public LiteDb_Extensions_Caching_Benchmarks()
+    public override async Task Setup()
     {
-        LiteDb.Extensions.Caching.ServiceCollectionExtensions.AddLiteDbCache(services, d =>
+        LiteDb.Extensions.Caching.ServiceCollectionExtensions.AddLiteDbCache(Services, d =>
         {
-            d.CachePath = Path.Join(cacheDirectory.FullName, "cache.db");
+            d.CachePath = Path.Join(CacheDirectory.FullName, "cache.db");
         });
+        await base.Setup();
     }
 }

@@ -2,8 +2,9 @@
 
 public class Caching_FileBackedDistributedCache_Benchmarks : Benchmarks
 {
-    public Caching_FileBackedDistributedCache_Benchmarks()
+    public override async Task Setup()
     {
-        FileBackedCache.Extensions.AddFileBackedCache(services, cacheDirectory.FullName);
+        FileBackedCache.Extensions.AddFileBackedCache(Services, CacheDirectory.FullName);
+        await base.Setup();
     }
 }

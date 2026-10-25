@@ -2,12 +2,13 @@
 
 public class DNeoSmart_Caching_Sqlite_Benchmarks : Benchmarks
 {
-    public DNeoSmart_Caching_Sqlite_Benchmarks()
+    public override async Task Setup()
     {
-        NeoSmart.Caching.Sqlite.AspSqliteCacheServiceCollectionExtensions.AddSqliteCache(services, d =>
+        NeoSmart.Caching.Sqlite.AspSqliteCacheServiceCollectionExtensions.AddSqliteCache(Services, d =>
         {
-            d.CachePath = Path.Join(cacheDirectory.FullName, "cache.db");
+            d.CachePath = Path.Join(CacheDirectory.FullName, "cache.db");
         });
+        await base.Setup();
     }
 
     protected override void Dispose(bool isDisposing)

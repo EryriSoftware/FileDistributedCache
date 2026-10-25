@@ -76,13 +76,13 @@ internal class WalPersistence : WriteAheadLog<Mutation>, IPersistence
         var paths = manifest.Values.Select(x => x.Path).ToHashSet();
         var allFiles = directoryOwner.Directory.EnumerateFiles("*.bytes", new EnumerationOptions { RecurseSubdirectories = true });
 
-        foreach (var file in allFiles)
+        Parallel.ForEach(allFiles, file =>
         {
             if (!paths.Contains(file.FullName))
             {
                 file.Delete();
             }
-        }
+        });
     }
 
     protected override void Serialize(Mutation mutation, IBufferWriter<byte> buffer) => buffer.Write(mutation);

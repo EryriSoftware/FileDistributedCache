@@ -227,7 +227,10 @@ Filesystem performance depends on the operating system, filesystem, storage medi
 
 The benchmark suite compares several `IDistributedCache` implementations and exercises both unconstrained and capacity-constrained Eryri configurations. Run the benchmarks on your target hardware and workload before making capacity or latency commitments. Published numbers are directional evidence, not a performance guarantee.
 
-The benchmark workload currently uses 4 KiB payloads, 10,000 initial entries, with 100 parallel operations.
+The benchmark workload currently uses
+- 4 KiB payloads
+- initial cache filled with 10000 entries
+- 100 parallel operations.
 
 ### Published results
 
@@ -236,63 +239,79 @@ The following results are the supplied BenchmarkDotNet output for the workload d
 Times are in microseconds (`us`). Allocated memory is per operation. `1 ms = 1,000 us` and `1 us = 1,000 ns`.
 
 #### Eryri.FileDistributedCache - unbounded
-| Method                      | Mean        | Error       | StdDev      | Median      | Min         | Allocated |
-|---------------------------- |------------:|------------:|------------:|------------:|------------:|----------:|
-| SetNewKey                   |  48.6698 us |   1.6104 us |   4.4623 us |  47.3963 us |  41.4725 us |    1647 B |
-| SetNewKeyBuffered           |  46.3539 us |   0.9470 us |   2.6084 us |  46.4723 us |  41.7333 us |    1522 B |
-| SetNewKeyAsync              |  45.7419 us |   1.4533 us |   4.0272 us |  44.6554 us |  39.9933 us |    1917 B |
-| SetNewKeyBufferedAsync      |  45.3707 us |   1.6728 us |   4.6074 us |  44.2067 us |  38.1356 us |    2256 B |
-| SetExistingKey              |  95.3772 us |   9.1494 us |  26.8337 us | 102.1533 us |  49.7350 us |    1345 B |
-| SetExistingKeyBuffered      | 100.0465 us |   9.1987 us |  27.1225 us | 106.9369 us |  54.5908 us |    1448 B |
-| SetExistingKeyAsync         |  92.6513 us |   7.5440 us |  22.2438 us |  96.0123 us |  50.9235 us |    1806 B |
-| SetExistingKeyBufferedAsync |  78.1942 us |   7.2130 us |  21.2678 us |  75.4123 us |  50.9038 us |    2225 B |
-| Get                         |  18.2335 us |   0.6381 us |   1.8512 us |  17.8342 us |  13.5563 us |    4938 B |
-| GetBuffered                 |  18.2412 us |   0.5263 us |   1.5185 us |  18.0954 us |  14.1256 us |    1270 B |
-| GetAsync                    |  18.4734 us |   0.6217 us |   1.8330 us |  18.5760 us |  14.4652 us |    5439 B |
-| GetBufferedAsync            |  18.5885 us |   0.6490 us |   1.9033 us |  18.3748 us |  14.3119 us |    1664 B |
-| GetMiss                     |   0.1409 us |   0.0116 us |   0.0338 us |   0.1350 us |   0.0921 us |      28 B |
-| GetBufferedMiss             |   0.1995 us |   0.0135 us |   0.0384 us |   0.1908 us |   0.1487 us |      62 B |
-| GetMissAsync                |   0.4891 us |   0.0480 us |   0.1378 us |   0.4854 us |   0.2779 us |      26 B |
-| GetBufferedMissAsync        |   0.5200 us |   0.0516 us |   0.1489 us |   0.4858 us |   0.3094 us |      58 B |
-| SetGetExistingKeyAsync      | 112.2482 us |  22.4940 us |  57.6608 us | 112.9388 us |  55.5738 us |    7193 B |
+
+| Method                      | Mean        | Error       | StdDev      | Median      | Min        | Allocated |
+|---------------------------- |------------:|------------:|------------:|------------:|-----------:|----------:|
+| SetNewKey                   |  68.1984 us |   2.0922 us |   5.9352 us |  67.6585 us | 56.7773 us |    1371 B |
+| SetNewKeyBuffered           |  75.9309 us |   5.6687 us |  15.5179 us |  70.3292 us | 60.3792 us |    1463 B |
+| SetNewKeyAsync              |  61.1024 us |   1.2078 us |   2.8233 us |  61.4290 us | 54.4973 us |    1858 B |
+| SetNewKeyBufferedAsync      |  63.9512 us |   1.2703 us |   3.3686 us |  63.5358 us | 54.5604 us |    2183 B |
+| SetExistingKey              |  65.0194 us |   1.8970 us |   5.2565 us |  64.8756 us | 51.5435 us |    1317 B |
+| SetExistingKeyBuffered      |  72.1364 us |   4.5393 us |  13.2415 us |  68.7404 us | 52.7331 us |    1492 B |
+| SetExistingKeyAsync         |  62.2095 us |   1.7267 us |   4.8134 us |  61.5533 us | 50.5821 us |    2168 B |
+| SetExistingKeyBufferedAsync |  59.4561 us |   2.1308 us |   5.8689 us |  57.9338 us | 48.9425 us |    2172 B |
+| Get                         |  22.2764 us |   0.7138 us |   2.0133 us |  22.0592 us | 16.5960 us |    4928 B |
+| GetBuffered                 |  22.7918 us |   0.6331 us |   1.8268 us |  22.7140 us | 17.6354 us |    1065 B |
+| GetAsync                    |  22.9685 us |   0.4725 us |   1.3171 us |  23.0533 us | 17.2733 us |    5702 B |
+| GetBufferedAsync            |  22.5720 us |   0.5588 us |   1.5852 us |  22.5875 us | 16.8017 us |    1664 B |
+| GetMiss                     |   0.2319 us |   0.0230 us |   0.0648 us |   0.2202 us |  0.1375 us |      28 B |
+| GetBufferedMiss             |   0.2717 us |   0.0111 us |   0.0311 us |   0.2696 us |  0.1929 us |      62 B |
+| GetMissAsync                |   0.5953 us |   0.0479 us |   0.1390 us |   0.5917 us |  0.3013 us |      26 B |
+| GetBufferedMissAsync        |   0.6678 us |   0.0521 us |   0.1496 us |   0.6783 us |  0.3767 us |      58 B |
+| SetGetExistingKeyAsync      | 108.5485 us |   5.4031 us |  13.7525 us | 108.9281 us | 64.9013 us |    7235 B |
 
 #### Eryri.FileDistributedCache - capacity constrained
 
 This run measures Eryri with capacity enforcement and eviction enabled. It is not directly equivalent to the unbounded run because the cache performs additional capacity work.
 
-| Method                      | Mean        | Error       | StdDev      | Median      | Min         | Allocated |
-|---------------------------- |------------:|------------:|------------:|------------:|------------:|----------:|
-| SetNewKey                   |  77.1885 us |   4.6616 us |  13.2242 us |  72.7521 us |  59.9237 us |    1549 B |
-| SetNewKeyBuffered           |  82.6619 us |   6.0598 us |  17.4839 us |  75.8871 us |  59.0633 us |    1741 B |
-| SetNewKeyAsync              |  68.9492 us |   3.7078 us |  10.4580 us |  65.7196 us |  55.9146 us |    2094 B |
-| SetNewKeyBufferedAsync      |  82.2422 us |   7.0511 us |  20.5685 us |  75.1725 us |  58.1585 us |    2448 B |
-| SetExistingKey              |  96.9676 us |   7.3365 us |  21.4008 us |  98.4587 us |  49.1331 us |    1329 B |
-| SetExistingKeyBuffered      |  96.8690 us |   8.5862 us |  25.1819 us | 101.2867 us |  51.3038 us |    1473 B |
-| SetExistingKeyAsync         |  87.6236 us |   9.0720 us |  26.7491 us |  89.2498 us |  48.5104 us |    1806 B |
+| Method                      | Mean        | Error       | StdDev      | Median      | Min        | Allocated |
+|---------------------------- |------------:|------------:|------------:|------------:|-----------:|----------:|
+| SetNewKey                   |  75.5887 us |   2.6702 us |   7.7042 us |  74.7296 us | 59.6169 us |    1478 B |
+| SetNewKeyBuffered           |  72.2988 us |   2.4905 us |   7.1458 us |  70.7137 us | 54.1379 us |    1720 B |
+| SetNewKeyAsync              |  73.1605 us |   2.4423 us |   7.0855 us |  71.5567 us | 59.4054 us |    1994 B |
+| SetNewKeyBufferedAsync      |  69.5835 us |   2.0364 us |   5.8755 us |  68.7827 us | 54.7060 us |    2645 B |
+
+#### [StackExchange.Redis](https://www.nuget.org/packages/StackExchange.Redis)
+
+This is a comparison run from the same benchmark harness. It is included for context, not as a universal ranking across all workloads.
+
+| Method                      | Mean     | Error    | StdDev   | Median   | Min      | Allocated |
+|---------------------------- |---------:|---------:|---------:|---------:|---------:|----------:|
+| SetNewKey                   | 20.94 us | 0.654 us | 1.677 us | 21.20 us | 16.48 us |    1803 B |
+| SetNewKeyAsync              | 28.81 us | 0.573 us | 1.569 us | 28.88 us | 24.80 us |    1620 B |
+| SetExistingKey              | 22.54 us | 0.697 us | 2.000 us | 22.58 us | 15.88 us |    1722 B |
+| SetExistingKeyAsync         | 27.12 us | 0.536 us | 1.232 us | 27.04 us | 23.99 us |    1522 B |
+| Get                         | 19.42 us | 0.536 us | 1.493 us | 19.36 us | 14.60 us |    4689 B |
+| GetAsync                    | 25.14 us | 0.627 us | 1.819 us | 24.83 us | 21.83 us |    5145 B |
+| GetMiss                     | 18.62 us | 0.497 us | 1.359 us | 18.59 us | 15.01 us |     493 B |
+| GetMissAsync                | 22.14 us | 0.579 us | 1.690 us | 22.25 us | 17.14 us |     939 B |
+| SetGetExistingKeyAsync      | 30.30 us | 0.555 us | 1.481 us | 30.18 us | 26.15 us |    6634 B |
+
+> StackExchange.Redis did not implement `IBufferDistributedCache` in this benchmark. These are capability differences, not just performance differences.
 
 #### [DamianH.FileDistributedCache](https://www.nuget.org/packages/DamianH.FileDistributedCache)
 
 This is a comparison run from the same benchmark harness. It is included for context, not as a universal ranking across all workloads.
 
-| Method                      | Mean       | Error     | StdDev     | Median     | Min        | Allocated |
-|---------------------------- |-----------:|----------:|-----------:|-----------:|-----------:|----------:|
-| SetNewKey                   | 130.211 us | 7.4796 us | 21.5803 us | 124.326 us |  76.633 us |   6.77 KB |
-| SetNewKeyBuffered           | 134.180 us | 8.6013 us | 25.2263 us | 128.971 us |  79.498 us |   6.77 KB |
-| SetNewKeyAsync              | 111.880 us | 8.5814 us | 24.7592 us | 105.423 us |  70.647 us |   6.64 KB |
-| SetNewKeyBufferedAsync      | 115.533 us | 7.5585 us | 22.2864 us | 114.005 us |  72.098 us |   6.64 KB |
-| SetExistingKey              | 306.386 us | 6.0879 us | 10.3377 us | 303.018 us | 293.998 us |   6.63 KB |
-| SetExistingKeyBuffered      | 304.744 us | 6.0021 us |  5.3207 us | 304.901 us | 292.319 us |   6.63 KB |
-| SetExistingKeyAsync         | 291.354 us | 5.7902 us |  8.1171 us | 289.830 us | 274.481 us |   6.79 KB |
-| SetExistingKeyBufferedAsync | 324.663 us | 9.6867 us | 28.1028 us | 318.774 us | 277.895 us |    6.8 KB |
-| Get                         |  54.035 us | 3.4810 us | 10.2639 us |  58.090 us |  31.043 us |   9.07 KB |
-| GetBuffered                 |  54.310 us | 3.4439 us | 10.1543 us |  57.022 us |  30.216 us |   5.08 KB |
-| GetAsync                    |  51.617 us | 3.6029 us | 10.6233 us |  56.920 us |  30.297 us |   9.76 KB |
-| GetBufferedAsync            |  56.638 us | 3.2759 us |  9.5041 us |  59.155 us |  31.245 us |    5.8 KB |
-| GetMiss                     |   5.089 us | 0.1733 us |  0.5056 us |   5.025 us |   4.104 us |   2.16 KB |
-| GetBufferedMiss             |   4.855 us | 0.1669 us |  0.4922 us |   4.926 us |   3.668 us |   2.19 KB |
-| GetMissAsync                |   5.077 us | 0.1573 us |  0.4612 us |   5.086 us |   4.072 us |   2.13 KB |
-| GetBufferedMissAsync        |   5.171 us | 0.1564 us |  0.4612 us |   5.144 us |   3.766 us |   2.16 KB |
-| SetGetExistingKeyAsync      | 318.364 us | 6.2585 us | 11.6005 us | 316.850 us | 296.212 us |  16.52 KB |
+| Method                      | Mean       | Error      | StdDev     | Median     | Min        | Allocated |
+|---------------------------- |-----------:|-----------:|-----------:|-----------:|-----------:|----------:|
+| SetNewKey                   | 183.461 us | 11.8540 us | 34.7656 us | 179.612 us | 129.659 us |   6.75 KB |
+| SetNewKeyBuffered           | 181.279 us | 14.7776 us | 42.8725 us | 179.094 us | 100.266 us |   6.78 KB |
+| SetNewKeyAsync              | 165.349 us | 15.0484 us | 43.8968 us | 156.314 us |  92.677 us |   6.64 KB |
+| SetNewKeyBufferedAsync      | 161.269 us | 12.3849 us | 35.9309 us | 158.660 us |  89.234 us |   6.64 KB |
+| SetExistingKey              | 405.241 us |  7.0975 us |  7.2886 us | 408.073 us | 383.613 us |   6.58 KB |
+| SetExistingKeyBuffered      | 410.677 us |  7.6830 us |  8.2208 us | 410.134 us | 399.028 us |   6.74 KB |
+| SetExistingKeyAsync         | 412.214 us |  7.3541 us |  6.8790 us | 410.487 us | 398.936 us |    6.8 KB |
+| SetExistingKeyBufferedAsync | 419.639 us |  8.3233 us |  8.5475 us | 419.328 us | 407.446 us |    6.8 KB |
+| Get                         |  44.415 us |  0.8623 us |  0.8066 us |  44.132 us |  43.506 us |   9.03 KB |
+| GetBuffered                 |  44.093 us |  0.8694 us |  0.9663 us |  43.916 us |  41.513 us |   5.04 KB |
+| GetAsync                    | 131.182 us | 19.0957 us | 56.3042 us | 147.255 us |  42.603 us |   9.75 KB |
+| GetBufferedAsync            | 128.434 us | 16.3112 us | 48.0939 us | 137.557 us |  43.552 us |   5.79 KB |
+| GetMiss                     |   7.269 us |  0.5684 us |  1.6124 us |   6.845 us |   5.014 us |   2.16 KB |
+| GetBufferedMiss             |   8.199 us |  0.4465 us |  1.3094 us |   8.088 us |   5.713 us |   2.19 KB |
+| GetMissAsync                |   6.576 us |  0.3684 us |  1.0747 us |   6.483 us |   4.501 us |   2.13 KB |
+| GetBufferedMissAsync        |   7.367 us |  0.3803 us |  1.1093 us |   7.339 us |   5.183 us |   2.16 KB |
+| SetGetExistingKeyAsync      | 768.271 us | 22.0366 us | 63.2271 us | 763.368 us | 623.854 us |  16.52 KB |
 
 > The comparison implementations do not necessarily provide the same feature set. In particular, their capacity behavior and eviction semantics differ; compare the capabilities you need, not only the mean latency.
 
@@ -300,17 +319,17 @@ This is a comparison run from the same benchmark harness. It is included for con
 
 This is a comparison run from the same benchmark harness. It is included for context, not as a universal ranking across all workloads.
 
-| Method                      | Mean        | Error      | StdDev       | Median      | Min         | Allocated |
-|---------------------------- |------------:|-----------:|-------------:|------------:|------------:|----------:|
-| SetNewKey                   |   119.10 us |  17.747 us |    52.327 us |   144.82 us |    52.35 us |   1.46 KB |
-| SetNewKeyAsync              |   118.36 us |  17.280 us |    50.949 us |   149.83 us |    51.33 us |   1.36 KB |
-| SetExistingKey              |    46.75 us |   1.234 us |     3.637 us |    45.82 us |    38.02 us |   1.31 KB |
-| SetExistingKeyAsync         |    47.19 us |   1.114 us |     3.283 us |    45.56 us |    42.24 us |   1.27 KB |
-| Get                         | 2,581.55 us | 340.981 us | 1,005.391 us | 3,046.15 us | 1,520.98 us |   5.55 KB |
-| GetAsync                    | 1,544.69 us |  16.929 us |    15.836 us | 1,542.57 us | 1,526.09 us |   5.78 KB |
-| GetMiss                     |    26.19 us |   0.471 us |     0.952 us |    26.16 us |    24.54 us |   1.49 KB |
-| GetMissAsync                |    29.02 us |   0.727 us |     2.132 us |    28.83 us |    25.56 us |   1.48 KB |
-| SetGetExistingKeyAsync      | 1,580.09 us |  31.381 us |    46.970 us | 1,564.36 us | 1,523.60 us |   7.02 KB |
+| Method                      | Mean        | Error      | StdDev     | Median      | Min         | Allocated |
+|---------------------------- |------------:|-----------:|-----------:|------------:|------------:|----------:|
+| SetNewKey                   |   244.10 us |  39.957 us | 117.186 us |   259.01 us |    85.80 us |   1.46 KB |
+| SetNewKeyAsync              |   228.01 us |  34.358 us | 101.304 us |   258.07 us |    87.35 us |   1.36 KB |
+| SetExistingKey              |    94.87 us |   2.239 us |   6.530 us |    93.96 us |    83.93 us |   1.41 KB |
+| SetExistingKeyAsync         |    80.67 us |   1.922 us |   5.576 us |    80.40 us |    69.77 us |   1.27 KB |
+| Get                         | 2,089.93 us | 311.994 us | 919.921 us | 1,578.79 us |    54.17 us |   5.56 KB |
+| GetAsync                    | 1,545.61 us |  16.441 us |  14.575 us | 1,542.59 us | 1,528.75 us |   5.78 KB |
+| GetMiss                     |    51.81 us |   0.933 us |   1.634 us |    51.40 us |    49.46 us |   1.49 KB |
+| GetMissAsync                |    58.13 us |   1.108 us |   1.138 us |    58.00 us |    56.66 us |   1.48 KB |
+| SetGetExistingKeyAsync      | 1,502.22 us | 126.527 us | 360.989 us | 1,597.09 us |   116.59 us |   7.04 KB |
 
 > NeoSmart.Caching.Sqlite did not implement `IBufferDistributedCache` in this benchmark and did not provide a configurable disk-usage or maximum-cache-size limit in the reviewed configuration. These are capability differences, not just performance differences.
 

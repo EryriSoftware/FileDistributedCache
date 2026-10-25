@@ -7,12 +7,13 @@ public class Eryri_FileDistributedCache_Benchmarks : Benchmarks
     [ParamsAllValues]
     public bool RunAtCapacity;
 
-    public Eryri_FileDistributedCache_Benchmarks()
+    public override async Task Setup()
     {
-        services.AddDistributedFileCache(d =>
+        Services.AddDistributedFileCache(d =>
         {
             d.SizeLimitBytes = RunAtCapacity ? InitialSize : null;
-            d.CacheDirectory = cacheDirectory.FullName;
+            d.CacheDirectory = CacheDirectory.FullName;
         });
+        await base.Setup();
     }
 }

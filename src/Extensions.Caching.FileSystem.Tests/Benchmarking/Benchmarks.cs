@@ -18,33 +18,33 @@ public abstract class Benchmarks : IDisposable
     public const int InitialNumberOfItems = 10_000;
     public const int InitialSize = InitialNumberOfItems * PayloadSize;
     public const int PayloadSize = 4 << 10; // 4 KiB
-    private CancellationToken CancellationToken => TestContext.CurrentContext.CancellationToken;
-    protected readonly DirectoryInfo cacheDirectory = Directory.CreateTempSubdirectory();
+    protected CancellationToken CancellationToken => TestContext.CurrentContext.CancellationToken;
+    protected readonly DirectoryInfo CacheDirectory = Directory.CreateTempSubdirectory();
     private readonly string key = Guid.NewGuid().ToString("N");
     private readonly string missingKey = Guid.NewGuid().ToString("N");
     private readonly byte[] payload = RandomNumberGenerator.GetBytes(PayloadSize);
-    protected readonly DistributedCacheEntryOptions cacheEntryOptions = new DistributedCacheEntryOptions
+
+    private readonly DistributedCacheEntryOptions cacheEntryOptions = new DistributedCacheEntryOptions
     {
         AbsoluteExpiration = DateTimeOffset.UtcNow.AddDays(2),
         AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1)
     };
-    protected readonly IServiceCollection services = new ServiceCollection();
+    protected readonly IServiceCollection Services = new ServiceCollection();
     private IDisposable? disposable;
     private IDistributedCache? cache;
     private IBufferDistributedCache? bufferedCache;
 
     [GlobalSetup]
-    public void Setup()
+    public virtual async Task Setup()
     {
-        var sp = services.BuildServiceProvider();
+        var sp = Services.BuildServiceProvider();
         disposable = sp;
         cache = sp.GetRequiredService<IDistributedCache>();
         bufferedCache = sp.GetService<IBufferDistributedCache>();
 
-        Parallel.For(0, InitialNumberOfItems, i =>
+        await Parallel.ForAsync(0, InitialNumberOfItems, CancellationToken, async (_, ct) =>
         {
-            var key = Guid.NewGuid().ToString("N");
-            cache!.Set(key, payload, cacheEntryOptions);
+            await cache!.SetAsync(Guid.NewGuid().ToString("N"), payload, cacheEntryOptions, ct);
         });
     }
 
@@ -66,54 +66,50 @@ public abstract class Benchmarks : IDisposable
         if (isDisposing)
         {
             disposable?.Dispose();
-            cacheDirectory.Delete(recursive: true);
+            CacheDirectory.Delete(recursive: true);
         }
     }
 
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public void SetNewKey()
     {
-        Parallel.For(0, ParallelOperations, i =>
+        Parallel.For(0, ParallelOperations, _ =>
         {
-            var key = Guid.NewGuid().ToString("N");
-            cache!.Set(key, payload, cacheEntryOptions);
+            cache!.Set(Guid.NewGuid().ToString("N"), payload, cacheEntryOptions);
         });
     }
 
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public void SetNewKeyBuffered()
     {
-        Parallel.For(0, ParallelOperations, i =>
+        Parallel.For(0, ParallelOperations, _ =>
         {
-            var key = Guid.NewGuid().ToString("N");
-            bufferedCache!.Set(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
+            bufferedCache!.Set(Guid.NewGuid().ToString("N"), new ReadOnlySequence<byte>(payload), cacheEntryOptions);
         });
     }
 
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public async Task SetNewKeyAsync()
     {
-        await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (i, ct) =>
+        await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (_, ct) =>
         {
-            var key = Guid.NewGuid().ToString("N");
-            await cache!.SetAsync(key, payload, cacheEntryOptions, ct);
+            await cache!.SetAsync(Guid.NewGuid().ToString("N"), payload, cacheEntryOptions, ct);
         });
     }
 
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public async Task SetNewKeyBufferedAsync()
     {
-        await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (i, ct) =>
+        await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (_, ct) =>
         {
-            var key = Guid.NewGuid().ToString("N");
-            await bufferedCache!.SetAsync(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions, ct);
+            await bufferedCache!.SetAsync(Guid.NewGuid().ToString("N"), new ReadOnlySequence<byte>(payload), cacheEntryOptions, ct);
         });
     }
 
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public void SetExistingKey()
     {
-        Parallel.For(0, ParallelOperations, i =>
+        Parallel.For(0, ParallelOperations, _ =>
         {
             cache!.Set(key, payload, cacheEntryOptions);
         });
@@ -122,7 +118,7 @@ public abstract class Benchmarks : IDisposable
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public void SetExistingKeyBuffered()
     {
-        Parallel.For(0, ParallelOperations, i =>
+        Parallel.For(0, ParallelOperations, _ =>
         {
             bufferedCache!.Set(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions);
         });
@@ -131,7 +127,7 @@ public abstract class Benchmarks : IDisposable
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public async Task SetExistingKeyAsync()
     {
-        await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (i, ct) =>
+        await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (_, ct) =>
         {
             await cache!.SetAsync(key, payload, cacheEntryOptions, ct);
         });
@@ -140,7 +136,7 @@ public abstract class Benchmarks : IDisposable
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public async Task SetExistingKeyBufferedAsync()
     {
-        await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (i, ct) =>
+        await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (_, ct) =>
         {
             await bufferedCache!.SetAsync(key, new ReadOnlySequence<byte>(payload), cacheEntryOptions, ct);
         });
@@ -149,7 +145,7 @@ public abstract class Benchmarks : IDisposable
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public void Get()
     {
-        Parallel.For(0, ParallelOperations, i =>
+        Parallel.For(0, ParallelOperations, _ =>
         {
             if (cache!.Get(key) == null)
             {
@@ -161,7 +157,7 @@ public abstract class Benchmarks : IDisposable
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public void GetBuffered()
     {
-        Parallel.For(0, ParallelOperations, i =>
+        Parallel.For(0, ParallelOperations, _ =>
         {
             using var buffer = new ArrayPoolBufferWriter<byte>(payload.Length);
             if (!bufferedCache!.TryGet(key, buffer))
@@ -174,7 +170,7 @@ public abstract class Benchmarks : IDisposable
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public async Task GetAsync()
     {
-        await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (i, ct) =>
+        await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (_, ct) =>
         {
             if (await cache!.GetAsync(key, ct) == null)
             {
@@ -186,7 +182,7 @@ public abstract class Benchmarks : IDisposable
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public async Task GetBufferedAsync()
     {
-        await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (i, ct) =>
+        await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (_, ct) =>
         {
             using var buffer = new ArrayPoolBufferWriter<byte>(payload.Length);
             if (!await bufferedCache!.TryGetAsync(key, buffer, ct))
@@ -199,7 +195,7 @@ public abstract class Benchmarks : IDisposable
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public void GetMiss()
     {
-        Parallel.For(0, ParallelOperations, i =>
+        Parallel.For(0, ParallelOperations, _ =>
         {
             if (cache!.Get(missingKey) != null)
             {
@@ -211,7 +207,7 @@ public abstract class Benchmarks : IDisposable
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public void GetBufferedMiss()
     {
-        Parallel.For(0, ParallelOperations, i =>
+        Parallel.For(0, ParallelOperations, _ =>
         {
             using var buffer = new ArrayPoolBufferWriter<byte>(payload.Length);
             if (bufferedCache!.TryGet(missingKey, buffer))
@@ -224,7 +220,7 @@ public abstract class Benchmarks : IDisposable
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public async Task GetMissAsync()
     {
-        await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (i, ct) =>
+        await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (_, ct) =>
         {
             if (await cache!.GetAsync(missingKey, ct) != null)
             {
@@ -236,7 +232,7 @@ public abstract class Benchmarks : IDisposable
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public async Task GetBufferedMissAsync()
     {
-        await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (i, ct) =>
+        await Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (_, ct) =>
         {
             using var buffer = new ArrayPoolBufferWriter<byte>(payload.Length);
             if (await bufferedCache!.TryGetAsync(missingKey, buffer, ct))
@@ -249,12 +245,12 @@ public abstract class Benchmarks : IDisposable
     [Benchmark(OperationsPerInvoke = ParallelOperations)]
     public async Task SetGetExistingKeyAsync()
     {
-        var setTasks = Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (i, ct) =>
+        var setTasks = Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (_, ct) =>
         {
             await cache!.SetAsync(key, payload, cacheEntryOptions, ct);
         });
 
-        var getTasks = Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (i, ct) =>
+        var getTasks = Parallel.ForAsync(0, ParallelOperations, CancellationToken, async (_, ct) =>
         {
             if (await cache!.GetAsync(key, ct) == null)
             {

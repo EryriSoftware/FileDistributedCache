@@ -4,12 +4,13 @@ namespace Eryri.Extensions.Caching.FileSystem.Tests.Benchmarking;
 
 public class DamianH_FileDistributedCache_Benchmarks : Benchmarks
 {
-    public DamianH_FileDistributedCache_Benchmarks()
+    public override async Task Setup()
     {
-        FileDistributedCacheServiceCollectionExtensions.AddFileDistributedCache(services, d =>
+        FileDistributedCacheServiceCollectionExtensions.AddFileDistributedCache(Services, d =>
         {
-            d.CacheDirectory = cacheDirectory.FullName;
+            d.CacheDirectory = CacheDirectory.FullName;
             d.MaxTotalSize = null;
         });
+        await base.Setup();
     }
 }

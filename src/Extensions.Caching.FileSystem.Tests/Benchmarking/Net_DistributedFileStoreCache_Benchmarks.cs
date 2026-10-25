@@ -7,14 +7,15 @@ public class Net_DistributedFileStoreCache_Benchmarks : Benchmarks
     [ParamsAllValues]
     public bool RunAtCapacity;
 
-    public Net_DistributedFileStoreCache_Benchmarks()
+    public override async Task Setup()
     {
-        Net.DistributedFileStoreCache.RegisterDistributedFileStoreCache.AddDistributedFileStoreCache(services, d =>
+        Net.DistributedFileStoreCache.RegisterDistributedFileStoreCache.AddDistributedFileStoreCache(Services, d =>
         {
-            d.PathToCacheFileDirectory = cacheDirectory.FullName;
+            d.PathToCacheFileDirectory = CacheDirectory.FullName;
             d.SecondPartOfCacheFileName = "cache";
             d.MaxBytesInJsonCacheFile = RunAtCapacity ? InitialSize : 10000;
             d.WhichVersion = Net.DistributedFileStoreCache.FileStoreCacheVersions.IDistributedCache;
         });
+        await base.Setup();
     }
 }
