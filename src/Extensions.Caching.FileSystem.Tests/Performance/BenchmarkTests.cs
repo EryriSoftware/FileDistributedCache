@@ -38,7 +38,6 @@ public class BenchmarkTests
             {
                 d.SizeLimitBytes = RunAtCapacity ? InitialSize : null;
                 d.CacheDirectory = cacheDirectory.FullName;
-                d.EvictionPolicy = EvictionPolicy.TTL;
             });
         }
     }
@@ -113,7 +112,7 @@ public class BenchmarkTests
     public abstract class Benchmarks : IDisposable
     {
         public const int ParallelOperations = 100;
-        public const int InitialNumberOfItems = 100;
+        public const int InitialNumberOfItems = 10_000;
         public const int InitialSize = InitialNumberOfItems * PayloadSize;
         public const int PayloadSize = 4 << 10; // 4 KiB
         protected readonly DirectoryInfo cacheDirectory = Directory.CreateTempSubdirectory();
