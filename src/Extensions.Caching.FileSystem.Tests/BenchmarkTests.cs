@@ -111,11 +111,7 @@ public class BenchmarkTests
     [MinColumn]
     [MeanColumn]
     [MedianColumn]
-    [SimpleJob(
-        launchCount: 1,
-        warmupCount: 3,
-        invocationCount: 1,
-        iterationCount: 3)]
+    [SimpleJob]
     public abstract class Benchmarks : IDisposable
     {
         public const int ParallelOperations = 100;
