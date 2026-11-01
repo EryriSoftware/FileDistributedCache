@@ -16,7 +16,7 @@ internal class Manifest(IOptions<FileCacheOptions> options)
     private readonly ConcurrentPriorityQueue<string, long> lruQueue = new();
     private readonly ConcurrentPriorityQueue<string, ulong> lfuQueue = new();
     private readonly ConcurrentPriorityQueue<string, long> ttlQueue = new();
-    private readonly ConcurrentQueue<string> fifoQueue = new();
+    private readonly ConcurrentPriorityQueue<string, int> fifoQueue = new();
 
     public void Clear()
     {
@@ -133,7 +133,7 @@ internal class Manifest(IOptions<FileCacheOptions> options)
             case EvictionPolicy.FIFO:
                 if (comparisonValue == null)
                 {
-                    fifoQueue.Enqueue(value.Key);
+                    fifoQueue.Enqueue(value.Key, 0);
                 }
 
                 break;
@@ -157,7 +157,7 @@ internal class Manifest(IOptions<FileCacheOptions> options)
                 lfuQueue.Remove(value.Key);
                 break;
             case EvictionPolicy.FIFO:
-                fifoQueue.Enqueue(value.Key);
+                fifoQueue.Remove(value.Key);
                 break;
             default:
                 throw new NotImplementedException(policy.ToString());
@@ -178,7 +178,7 @@ internal class Manifest(IOptions<FileCacheOptions> options)
             EvictionPolicy.TTL => ttlQueue.TryDequeue(out candidate, out _),
             EvictionPolicy.LRU => lruQueue.TryDequeue(out candidate, out _),
             EvictionPolicy.LFU => lfuQueue.TryDequeue(out candidate, out _),
-            EvictionPolicy.FIFO => fifoQueue.TryDequeue(out candidate),
+            EvictionPolicy.FIFO => fifoQueue.TryDequeue(out candidate, out _),
             _ => throw new NotImplementedException(policy.ToString())
         };
 
