@@ -41,7 +41,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         RemoveExpired();
     }
 
-    private readonly ConcurrentDictionary<string, Lazy<string>> directories = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, string> directories = new(StringComparer.Ordinal);
     private bool isDisposed = false;
     private readonly ILogger? logger;
     private readonly FileCacheOptions settings;
@@ -304,8 +304,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         var shard = id[..ShardingDepth()];
         var now = timeProvider.GetUtcNow().UtcTicks;
         var shardDirectory = directories
-            .GetOrAdd(shard, static (shard, root) => new Lazy<string>(() => Directory.CreateDirectory(Path.Combine(root, shard)).FullName), cacheDirectory.FullName)
-            .Value; // Ensure the directory is created before writing the file
+            .GetOrAdd(shard, static (shard, root) => Directory.CreateDirectory(Path.Combine(root, shard)).FullName, cacheDirectory.FullName);
         var path = Path.Combine(shardDirectory, id);
         return new Metadata(
             Key: key,
