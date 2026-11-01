@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
+using Eryri.Buffers;
 using Eryri.Extensions.Caching.FileSystem.Domain.Persistence;
 using Eryri.Extensions.Caching.FileSystem.Extensions;
 using Eryri.Extensions.Caching.FileSystem.Models;
@@ -80,22 +81,10 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     public byte[]? Get(string key)
     {
-        while (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
-        {
-            if (UpdateEntry(key, true, out entry))
-            {
-                try
-                {
-                    return File.ReadAllBytes(entry.Path);
-                }
-                catch (FileNotFoundException)
-                {
-                    Remove(entry);
-                }
-            }
-        }
-
-        return null;
+        using var buffer = new ArrayPoolBufferWriter<byte>();
+        return TryGet(key, buffer)
+            ? buffer.WrittenSpan.ToArray()
+            : null;
     }
 
     public async ValueTask<bool> TryGetAsync(string key, IBufferWriter<byte> destination, CancellationToken cancellationToken)
@@ -121,22 +110,10 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
     public async Task<byte[]?> GetAsync(string key, CancellationToken cancellationToken)
     {
-        while (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
-        {
-            if (UpdateEntry(key, true, out entry))
-            {
-                try
-                {
-                    return await File.ReadAllBytesAsync(entry.Path, cancellationToken);
-                }
-                catch (FileNotFoundException)
-                {
-                    Remove(entry);
-                }
-            }
-        }
-
-        return null;
+        using var buffer = new ArrayPoolBufferWriter<byte>();
+        return await TryGetAsync(key, buffer, cancellationToken)
+            ? buffer.WrittenSpan.ToArray()
+            : null;
     }
 
     public void Set(string key, ReadOnlySequence<byte> value, DistributedCacheEntryOptions options)
@@ -396,6 +373,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         {
             isDisposed = true;
             deletionChannel.Writer.TryComplete();
+            deletionConsumer?.GetAwaiter().GetResult();
             channelCancellationTokenSource.Cancel();
             channelCancellationTokenSource.Dispose();
             cleanupTimer.Dispose();

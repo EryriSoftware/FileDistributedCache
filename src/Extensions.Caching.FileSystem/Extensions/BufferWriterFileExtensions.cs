@@ -15,7 +15,7 @@ internal static class BufferWriterFileExtensions
                 path,
                 FileMode.Open,
                 FileAccess.Read,
-                FileShare.Read,
+                FileShare.Read | FileShare.Delete,
                 bufferSize: BufferSize,
                 options: FileOptions.Asynchronous | FileOptions.SequentialScan);
 
@@ -29,7 +29,7 @@ internal static class BufferWriterFileExtensions
                 path,
                 FileMode.Open,
                 FileAccess.Read,
-                FileShare.Read,
+                FileShare.Read | FileShare.Delete,
                 bufferSize: BufferSize,
                 options: FileOptions.SequentialScan);
 
