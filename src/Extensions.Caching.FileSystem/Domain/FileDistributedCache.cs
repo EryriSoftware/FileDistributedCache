@@ -37,7 +37,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         });
         deletionConsumer = ProcessDeletesAsync(channelCancellationTokenSource.Token);
 
-        persistance.InitializeAsync(CancellationToken.None);
+        persistance.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
         RemoveExpired();
     }
 
