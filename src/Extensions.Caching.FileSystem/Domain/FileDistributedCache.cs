@@ -126,7 +126,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             value.WriteAllBytes(entry.Path);
             PublishEntry(entry);
         }
-        catch (FileNotFoundException ex)
+        catch (Exception ex)
         {
             TryDelete(entry.Path);
             logger?.LogCritical(ex, "Failed to write cache file");
