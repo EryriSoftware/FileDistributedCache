@@ -68,7 +68,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             }
             catch (IOException)
             {
-                // The entry was replaced; retry the manifest lookup.
+                Remove(entry);
             }
         }
 
@@ -86,7 +86,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             }
             catch (IOException)
             {
-                // The entry was replaced; retry the manifest lookup.
+                Remove(entry);
             }
         }
 
@@ -105,7 +105,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             }
             catch (IOException)
             {
-                // The entry was replaced; retry the manifest lookup.
+                Remove(entry);
             }
         }
 
@@ -123,7 +123,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             }
             catch (IOException)
             {
-                // The entry was replaced; retry the manifest lookup.
+                Remove(entry);
             }
         }
 
