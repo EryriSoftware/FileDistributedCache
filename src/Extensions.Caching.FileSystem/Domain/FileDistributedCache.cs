@@ -41,7 +41,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         RemoveExpired();
     }
 
-    private readonly ConcurrentDictionary<string, Lazy<string>> directories = new (StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Lazy<string>> directories = new(StringComparer.Ordinal);
     private bool isDisposed = false;
     private readonly ILogger? logger;
     private readonly FileCacheOptions settings;
@@ -68,7 +68,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                     destination.ReadFile(entry.Path);
                     return true;
                 }
-                catch (IOException)
+                catch (FileNotFoundException)
                 {
                     Remove(entry);
                 }
@@ -88,7 +88,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                 {
                     return File.ReadAllBytes(entry.Path);
                 }
-                catch (IOException)
+                catch (FileNotFoundException)
                 {
                     Remove(entry);
                 }
@@ -109,7 +109,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                     await destination.ReadFileAsync(entry.Path, cancellationToken);
                     return true;
                 }
-                catch (IOException)
+                catch (FileNotFoundException)
                 {
                     Remove(entry);
                 }
@@ -129,7 +129,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                 {
                     return await File.ReadAllBytesAsync(entry.Path, cancellationToken);
                 }
-                catch (IOException)
+                catch (FileNotFoundException)
                 {
                     Remove(entry);
                 }
@@ -149,7 +149,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
             value.WriteAllBytes(entry.Path);
             PublishEntry(entry);
         }
-        catch (Exception ex)
+        catch (FileNotFoundException ex)
         {
             TryDelete(entry.Path);
             logger?.LogCritical(ex, "Failed to write cache file");
@@ -353,22 +353,22 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
 
         while (requiredFreeSpace > 0 && manifest.TryDequeueEvictionPolicy(out var item))
         {
-            Remove(item);
-            requiredFreeSpace -= item.SizeBytes;
+            if (Remove(item))
+            {
+                requiredFreeSpace -= item.SizeBytes;
+            }
         }
     }
 
-    private long RemoveExpired()
+    private void RemoveExpired()
     {
         nextCleanup = DateTimeOffset.MaxValue.UtcTicks;
-        long removedBytes = 0;
         var now = timeProvider.GetUtcNow().UtcTicks;
         while (manifest.TryDequeueTTL(out var item))
         {
             if (item.ExpirationTicks <= now)
             {
                 Remove(item);
-                removedBytes += item.SizeBytes;
             }
             else
             {
@@ -377,8 +377,6 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
                 break;
             }
         }
-
-        return removedBytes;
     }
 
     private void EnsureCapacityFor(long requiredFreeSpace)

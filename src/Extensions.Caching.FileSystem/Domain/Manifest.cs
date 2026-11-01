@@ -167,10 +167,7 @@ internal class Manifest(IOptions<FileCacheOptions> options)
 
     public void EnqueueTtl(Metadata value)
     {
-        if (value.ExpirationTicks.HasValue)
-        {
-            ttlQueue.Enqueue(value.Key, value.ExpirationTicks.Value);
-        }
+        ttlQueue.Enqueue(value.Key, value.ExpirationTicks ?? DateTimeOffset.MaxValue.UtcTicks);
     }
 
     private bool TryDequeueCandidate(EvictionPolicy policy, [MaybeNullWhen(false)] out string candidate) =>
