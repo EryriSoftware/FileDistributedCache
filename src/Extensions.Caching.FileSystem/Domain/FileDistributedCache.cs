@@ -1,6 +1,7 @@
 ﻿using System.Buffers;
 using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 using Eryri.Extensions.Caching.FileSystem.Domain.Persistence;
 using Eryri.Extensions.Caching.FileSystem.Extensions;
@@ -60,15 +61,17 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         while (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
         {
-            UpdateEntry(key, true);
-            try
+            if (UpdateEntry(key, true, out entry))
             {
-                destination.ReadFile(entry.Path);
-                return true;
-            }
-            catch (IOException)
-            {
-                Remove(entry);
+                try
+                {
+                    destination.ReadFile(entry.Path);
+                    return true;
+                }
+                catch (IOException)
+                {
+                    Remove(entry);
+                }
             }
         }
 
@@ -79,14 +82,16 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         while (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
         {
-            UpdateEntry(key, true);
-            try
+            if (UpdateEntry(key, true, out entry))
             {
-                return File.ReadAllBytes(entry.Path);
-            }
-            catch (IOException)
-            {
-                Remove(entry);
+                try
+                {
+                    return File.ReadAllBytes(entry.Path);
+                }
+                catch (IOException)
+                {
+                    Remove(entry);
+                }
             }
         }
 
@@ -97,15 +102,17 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         while (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
         {
-            UpdateEntry(key, true);
-            try
+            if (UpdateEntry(key, true, out entry))
             {
-                await destination.ReadFileAsync(entry.Path, cancellationToken);
-                return true;
-            }
-            catch (IOException)
-            {
-                Remove(entry);
+                try
+                {
+                    await destination.ReadFileAsync(entry.Path, cancellationToken);
+                    return true;
+                }
+                catch (IOException)
+                {
+                    Remove(entry);
+                }
             }
         }
 
@@ -116,14 +123,16 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         while (manifest.TryGetValue(key, out var entry) && !RemoveIfExpired(entry))
         {
-            UpdateEntry(key, true);
-            try
+            if (UpdateEntry(key, true, out entry))
             {
-                return await File.ReadAllBytesAsync(entry.Path, cancellationToken);
-            }
-            catch (IOException)
-            {
-                Remove(entry);
+                try
+                {
+                    return await File.ReadAllBytesAsync(entry.Path, cancellationToken);
+                }
+                catch (IOException)
+                {
+                    Remove(entry);
+                }
             }
         }
 
@@ -200,22 +209,21 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         }
     }
 
-    public void Refresh(string key)
-    {
-        UpdateEntry(key, false);
-    }
+    public void Refresh(string key) => UpdateEntry(key, false, out _);
 
-    private void UpdateEntry(string key, bool isAccessed)
+    private bool UpdateEntry(string key, bool isAccessed, [MaybeNullWhen(false)] out Metadata entry)
     {
-        while (manifest.TryGetValue(key, out var entry))
+        while (manifest.TryGetValue(key, out entry))
         {
             if (manifest.TryUpdate(key, entry, timeProvider.GetUtcNow().UtcTicks, isAccessed, out var newEntry))
             {
                 persistance.Update(newEntry);
                 QueueCleanup(newEntry.ExpirationTicks);
-                return;
+                return true;
             }
         }
+
+        return false;
     }
 
     private bool RemoveIfExpired(Metadata entry) =>
