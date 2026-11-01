@@ -41,7 +41,7 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
         RemoveExpired();
     }
 
-    private readonly ConcurrentDictionary<string, Lazy<string>> directories = new (StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, Lazy<string>> directories = new (StringComparer.Ordinal);
     private bool isDisposed = false;
     private readonly ILogger? logger;
     private readonly FileCacheOptions settings;

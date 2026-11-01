@@ -12,7 +12,7 @@ internal class Manifest(IOptions<FileCacheOptions> options)
     public long Size => Volatile.Read(ref _size);
     public int Count => files.Count;
     public ICollection<Metadata> Values => files.Values;
-    private readonly ConcurrentDictionary<string, Metadata> files = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, Metadata> files = new(StringComparer.Ordinal);
     private readonly ConcurrentPriorityQueue<string, long> lruQueue = new();
     private readonly ConcurrentPriorityQueue<string, ulong> lfuQueue = new();
     private readonly ConcurrentPriorityQueue<string, long> ttlQueue = new();
