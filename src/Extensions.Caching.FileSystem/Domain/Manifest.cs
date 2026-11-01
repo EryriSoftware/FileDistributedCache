@@ -68,6 +68,7 @@ internal class Manifest(IOptions<FileCacheOptions> options)
     {
         if (files.TryRemove(key, out value))
         {
+            Dequeue(value);
             Interlocked.Add(ref _size, -value.SizeBytes);
             return true;
         }
