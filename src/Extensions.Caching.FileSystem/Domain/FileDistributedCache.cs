@@ -215,10 +215,10 @@ internal class FileDistributedCache : IFileDistributedCache, IDisposable
     {
         while (manifest.TryGetValue(key, out entry))
         {
-            if (manifest.TryUpdate(key, entry, timeProvider.GetUtcNow().UtcTicks, isAccessed, out var newEntry))
+            if (manifest.TryUpdate(key, entry, timeProvider.GetUtcNow().UtcTicks, isAccessed, out entry))
             {
-                persistance.Update(newEntry);
-                QueueCleanup(newEntry.ExpirationTicks);
+                persistance.Update(entry);
+                QueueCleanup(entry.ExpirationTicks);
                 return true;
             }
         }
